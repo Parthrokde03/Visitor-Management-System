@@ -11,44 +11,73 @@
                         <field name="location_ids">
                             <list>
                                 <field name="name" />
-                                <field name="nda_required" />
-                                <field name="photo_required" />
-                                <field name="question_required" />
+                                <field name="nda" />
+                                <!-- <field name="nda_required" string="Required" /> -->
+                                <field name="photo" />
+                                <!-- <field name="photo_required" string="Required" /> -->
+                                <field name="question" />
+                                <!-- <field name="question_required" string="Required" /> -->
                             </list>
 
                             <form string="Location">
-                                <group>
-                                    <field name="name" string="Location"/>
-                                    <field name="nda_required" />
-                                    <field name="photo_required" />
-                                    <field name="question_required" />
-                                </group>
+                                <sheet>
+                                    <group>
+                                        <field name="name" string="Location" />
+                                    </group>
 
-                                <group string="Additional Questions">
-                                    <field name="additional_question_ids">
-                                        <list editable="bottom">
-                                            <field name="question_text" />
-                                            <field name="question_type" />
-                                            <field name="required" />
-                                        </list>
-                                    </field>
-                                </group>
+                                    <!-- 2 columns: left = feature, right = its Required -->
+                                    <group>
+                                        <!-- left column -->
+                                        <group>
+                                            <field name="nda" />
+                                            <field name="photo" />
+                                            <field name="question" />
+                                        </group>
 
-                                <group string="Visitor Fields">
-                                    <field name="visitor_field_ids">
-                                        <list editable="bottom">
-                                            <field name="field_id" />
-                                            <field name="label" />
-                                            <field name="field_type" />
-                                            <field name="enabled" />
-                                            <field name="required" />
-                                        </list>
-                                    </field>
-                                </group>
+                                        <!-- right column -->
+                                        <group>
+                                            <field name="nda_required" string="Required"
+                                                attrs="{'readonly':[('nda','=',False)]}" />
+                                            <field name="photo_required" string="Required"
+                                                attrs="{'readonly':[('photo','=',False)]}" />
+                                            <field name="question_required" string="Required"
+                                                attrs="{'readonly':[('question','=',False)]}" />
+                                        </group>
+                                    </group>
+
+                                    <group string="Additional Questions">
+                                        <field name="additional_question_ids" mode="list">
+                                            <list editable="bottom">
+                                                <field name="question_text" />
+                                                <field name="question_type" />
+                                                <field name="required" />
+                                            </list>
+                                        </field>
+                                    </group>
+
+                                    <group string="Visitor Fields">
+                                        <field name="visitor_field_ids" mode="list">
+                                            <list editable="bottom">
+                                                <field name="field_id" />
+                                                <field name="label" />
+                                                <field name="field_type" />
+                                                <field name="enabled" />
+                                                <field name="required" />
+                                            </list>
+                                        </field>
+                                    </group>
+
+                                    <group string="NDA Content">
+                                        <field name="nda_details" widget="html"
+                                            placeholder="Write NDA content here..." />
+                                    </group>
+                                </sheet>
                             </form>
-                        </field>
 
+
+                        </field>
                     </page>
+
 
                 </notebook>
             </field>

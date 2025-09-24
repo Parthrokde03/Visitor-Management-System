@@ -40,6 +40,8 @@
                     <!-- 📌 Avatar Photo Field -->
                     <field name="photo_answer" widget="image" class="oe_avatar"
                         options="{'preview_image': 'photo_answer'}" />
+                    <field name="nda_answer" widget="image" class="oe_avatar"
+                        options="{'preview_image': 'nda_answer'}" />
 
                     <!-- Visitor Details -->
                     <!-- <div class="oe_title mb24">
@@ -56,7 +58,8 @@
                             <field name="visiting_date" />
                             <field name="company" />
                             <field name="location_id" />
-                            <field name="employee" />
+                            <field name="employee" groups="visitor_management.group_employee" readonly="True"/>
+                            <field name="employee" groups="visitor_management.group_admin" />
                             <field name="company_id" />
                             <field name="purpose" />
                             <field name="instructions" />

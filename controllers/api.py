@@ -7,6 +7,7 @@ from odoo import http
 from odoo.http import Response, request
 from datetime import date, datetime, timedelta
 from odoo import _
+import base64
 from odoo.addons.bus.models.bus import dispatch
 
 _logger = logging.getLogger(__name__)
@@ -49,16 +50,17 @@ class VisitorQRController(http.Controller):
     def verify_qr(self, token, **kw):
         try:
             payload = request.httprequest.get_json(force=True, silent=True) or {}
-            action = payload.get("action")
             device = payload.get("device")
 
             _logger.info(f"Incoming Payload: {payload}")  # Debug
             
             data = {}
 
+            # Device check
             if device != "1234":
                 return {"Status": 0, "Message": f"Device id not matched. Got: {device}", "Data": data}
             
+            # Verify QR & Visitor
             visitor = request.env['visit.information'].sudo().search([
                 ('qr_token', '=', token),
                 ('status', '=', "approved")
@@ -70,66 +72,17 @@ class VisitorQRController(http.Controller):
             if not visitor.visiting_date or visitor.visiting_date.date() != date.today():
                 return {"Status": 0, "Message": "Visitor registered, but not scheduled for today.", "Data": data}
 
-            if action == "checkin":
-                if visitor.check_out:
-                    # User already checked out
-                    return {"Status": 0, "Message": "Visitor has already checked out. Cannot check-in again.", "Data": data}
-                
-                if not visitor.check_in:
-                    check_in_time = datetime.now()
-                    visitor.sudo().write({'check_in': check_in_time})
-                    
-                    # Notification check-out :
-                    if visitor.employee and visitor.employee.user_id:
-                        message = {
-                            'title': "Visitor Check-in",
-                            'message': f" {visitor.name} has checked in at {check_in_time.strftime('%H:%M')}.",
-                            'sticky': True,
-                            'type': 'info'
-                        }
-                        request.env['bus.bus']._sendone(
-                            visitor.employee.user_id.partner_id,
-                            'simple_notification',
-                            message
-                        )
-                        
-                    data = {"name": visitor.name, "check_in": check_in_time.strftime("%Y-%m-%d %H:%M:%S"),"instruction": visitor.instructions}
-                    return {"Status": 1, "Message": "Visitor check-in successful.", "Data": data}
-                else:
-                    return {"Status": 0, "Message": "Already checked in.", "Data": data}
-
-            elif action == "checkout":
-                if visitor.check_in and not visitor.check_out:
-                    check_out_time = datetime.now()
-                    visitor.sudo().write({'check_out': check_out_time})
-                    
-                    # Notification check-out :
-                    if visitor.employee and visitor.employee.user_id:
-                        message = {
-                            'title': "Visitor Check-out",
-                            'message': f" {visitor.name} has checked in at {check_out_time.strftime('%H:%M')}.",
-                            'sticky': True,
-                            'type': 'info'
-                        }
-                        request.env['bus.bus']._sendone(
-                            visitor.employee.user_id.partner_id,
-                            'simple_notification',
-                            message
-                        )
-                        
-                    data = {"name": visitor.name, "check_out": check_out_time.strftime("%Y-%m-%d %H:%M:%S")}
-                    return {"Status": 1, "Message": "Visitor check-out successful.", "Data": data}
-                elif not visitor.check_in:
-                    return {"Status": 0, "Message": "Cannot check-out before check-in.", "Data": data}
-                else:
-                    return {"Status": 0, "Message": "Already checked out.", "Data": data}
-
-            else:
-                return {"Status": 0, "Message": "Invalid action. Use 'checkin' or 'checkout'.", "Data": data}
+            # Return requirements only
+            return {
+                "Status": 1,
+                "Message": "QR verified successfully.",
+                "VisitorID": visitor.id,
+            }
 
         except Exception as e:
             _logger.exception("Error in QR verification")
             return {"Status": -1, "Message": f"Internal Server Error: {str(e)}", "Data": {}}
+
         
 class SendmeCommon:
     @staticmethod
@@ -209,33 +162,67 @@ class Otp(http.Controller):
             payload = request.httprequest.get_json(force=True, silent=True) or {}
             mobile = payload.get("mobileNumber")
             otp = payload.get("accessToken")
-            action = payload.get("action")  # "checkin" or "checkout"
 
             _logger.info(f"Incoming OTP Payload: {payload}")
 
-            if not mobile or not otp or not action:
-                return {"Status": 0, "Message": "Invalid request. Mobile, OTP and action are required.", "Data": {}}
+            if not mobile or not otp:
+                return {"Status": 0, "Message": "Invalid request. Mobile and OTP are required.", "Data": {}}
 
-            # search
+            # search visitor for today
             today, tomorrow = self._get_today_range()
             visitor = request.env['visit.information'].sudo().search([
                 ('phone', '=', mobile),
                 ('visiting_date', '>=', today),
                 ('visiting_date', '<', tomorrow)
             ], limit=1)
-            
+
+            # If no visitor OR visitor record has no name → treat as new user
+            if not visitor or not visitor.name:
+                return {
+                    "Status": 1,
+                    "Message": "New user - please register",
+                    "Data": {},
+                    "Newuser": 1
+                }
+
             # OTP check
             if not otp.isdigit() or int(otp) != int(visitor.otp_code or 0):
                 return {"Status": 0, "Message": "Invalid OTP!", "Data": {}}
 
-            # No record at all → user never requested OTP
-            if not visitor or not visitor.name:
-                return {"Status": 1, "Message": "New user - please register", "Data": {}, "Newuser": 1}
+            if visitor.status != "approved":
+                return {"Status": 0, "Message": f"Visitor not approved yet (status={visitor.status}).", "Data": {}}
+
+            return {
+                "Status": 1,
+                "Message": "OTP verified successfully.",
+                "VisitorID": visitor.id
+            }
+
+
+        except Exception as e:
+            _logger.exception("Error in OTP verification")
+            return {"Status": -1, "Message": f"Internal Server Error: {str(e)}", "Data": {}}
+
+
+    @http.route('/visitor/checkin_out', type='json', auth='public', methods=['POST'], csrf=False)
+    def visitor_attendance(self, **kw):
+        try:
+            payload = request.httprequest.get_json(force=True, silent=True) or {}
+            visitor_id = payload.get("visitor_id")
+            action = payload.get("action")  # "checkin" or "checkout"
+
+            _logger.info(f"Incoming Attendance Payload: {payload}")
+
+            if not visitor_id or not action:
+                return {"Status": 0, "Message": "Invalid request. Visitor ID and action are required.", "Data": {}}
+
+            visitor = request.env['visit.information'].sudo().browse(int(visitor_id))
+            if not visitor.exists():
+                return {"Status": 0, "Message": "Visitor not found.", "Data": {}}
 
             if visitor.status != "approved":
                 return {"Status": 0, "Message": f"Visitor not approved yet (status={visitor.status}).", "Data": {}}
 
-            data = {}
             # === Check-in ===
             if action == "checkin":
                 if visitor.check_out:
@@ -245,11 +232,11 @@ class Otp(http.Controller):
                     check_in_time = datetime.now()
                     visitor.sudo().write({'check_in': check_in_time})
 
-                    # Notification check-in :
+                    # Notify employee
                     if visitor.employee and visitor.employee.user_id:
                         message = {
                             'title': "Visitor Check-in",
-                            'message': f" {visitor.name} has checked in at {check_in_time.strftime('%H:%M')}.",
+                            'message': f"{visitor.name} has checked in at {check_in_time.strftime('%H:%M')}.",
                             'sticky': True,
                             'type': 'info'
                         }
@@ -273,12 +260,12 @@ class Otp(http.Controller):
                 if visitor.check_in and not visitor.check_out:
                     check_out_time = datetime.now()
                     visitor.sudo().write({'check_out': check_out_time})
-                    
-                    # Notification check-out :
+
+                    # Notify employee
                     if visitor.employee and visitor.employee.user_id:
                         message = {
                             'title': "Visitor Check-out",
-                            'message': f" {visitor.name} has checked in at {check_out_time.strftime('%H:%M')}.",
+                            'message': f"{visitor.name} has checked out at {check_out_time.strftime('%H:%M')}.",
                             'sticky': True,
                             'type': 'info'
                         }
@@ -287,10 +274,8 @@ class Otp(http.Controller):
                             'simple_notification',
                             message
                         )
-                    data = {
-                        "name": visitor.name,
-                        "check_out": check_out_time.strftime("%Y-%m-%d %H:%M:%S")
-                    }
+
+                    data = {"name": visitor.name, "check_out": check_out_time.strftime("%Y-%m-%d %H:%M:%S")}
                     return {"Status": 1, "Message": "Visitor check-out successful.", "Data": data}
                 elif not visitor.check_in:
                     return {"Status": 0, "Message": "Cannot check-out before check-in.", "Data": {}}
@@ -301,8 +286,9 @@ class Otp(http.Controller):
                 return {"Status": 0, "Message": "Invalid action. Use 'checkin' or 'checkout'.", "Data": {}}
 
         except Exception as e:
-            _logger.exception("Error in OTP verification")
+            _logger.exception("Error in Attendance API")
             return {"Status": -1, "Message": f"Internal Server Error: {str(e)}", "Data": {}}
+
 
 
 
@@ -362,17 +348,15 @@ class VisitorForm(http.Controller):
             email = data.get("email")
             phone = data.get("phone")     
             company = data.get("company")   
-            location_id = data.get("location_id")   # expect ID here
+            location_id = data.get("location_id")
             employee = data.get("employee")
             purpose = data.get("purpose")
 
             if not name or not phone:
                 return {"Status": 0, "Message": "Name and Phone are required."}
 
-            # fetch employee first
             emp = request.env["hr.employee"].sudo().browse(int(employee)) if employee else False
 
-            # Search for existing visitor created during OTP stage
             today, tomorrow = self._get_today_range()
             visitor = request.env["visit.information"].sudo().search([
                 ('phone', '=', phone),
@@ -401,19 +385,10 @@ class VisitorForm(http.Controller):
                 })
                 visitor = request.env["visit.information"].sudo().create(vals)
 
-            # Send mail if employee has email
-            if emp and emp.work_email:
-                template = request.env.ref("visitor_management.email_visit_request")  
-                if template:
-                    template.sudo().send_mail(visitor.id, force_send=True)
-
             return {
                 "Status": 1,
-                "Message": "Form submitted successfully and email to employee!",
+                "Message": "Form submitted successfully!",
                 "VisitorID": visitor.id,
-                "RequireNDA": visitor.location_id.nda_required,
-                "RequirePhoto": visitor.location_id.photo_required,
-                "RequireQuestions": visitor.location_id.question_required,
             }
 
         except Exception as e:
@@ -423,9 +398,97 @@ class VisitorForm(http.Controller):
                 "Message": f"Error: {str(e)}"
             }
 
-            
+    @http.route('/visitor/sendNotification', auth='public', type='http', methods=['POST'], csrf=False)
+    def send_notification(self, **kw):
+        try:
+            # If JSON body is sent, parse it
+            if request.httprequest.data:
+                data = json.loads(request.httprequest.data.decode('utf-8'))
+            else:
+                data = kw  # fallback to form-data
 
-    
+            visitor_id = data.get("visitor_id")
+
+            if not visitor_id:
+                return request.make_response(
+                    json.dumps({"Status": 0, "Message": "Visitor ID is required."}),
+                    headers=[("Content-Type", "application/json")]
+                )
+
+            visitor = request.env["visit.information"].sudo().browse(int(visitor_id))
+            if not visitor.exists():
+                return request.make_response(
+                    json.dumps({"Status": 0, "Message": "Visitor not found."}),
+                    headers=[("Content-Type", "application/json")]
+                )
+
+            emp = visitor.employee
+            if emp and emp.work_email:
+                template = request.env.ref("visitor_management.email_visit_request")
+                if template:
+                    ctx = {
+                        "default_email_from": emp.company_id.email or "no-reply@yourdomain.com",
+                        "email_to": emp.work_email,
+                        "lang": emp.user_id.lang or "en_US",
+                    }
+                    template.sudo().with_context(ctx).send_mail(visitor.id, force_send=True)
+                    return request.make_response(
+                        json.dumps({
+                            "Status": 1,
+                            "Message": "Notification sent to employee!",
+                            "VisitorID": visitor.id
+                        }),
+                        headers=[("Content-Type", "application/json")]
+                    )
+
+
+        except Exception as e:
+            _logger.error(f"Error sending notification: {str(e)}")
+            return request.make_response(
+                json.dumps({"Status": 0, "Message": f"Error: {str(e)}"}),
+                headers=[("Content-Type", "application/json")]
+            )
+
+
+            
+            
+    @http.route('/visitor/requirements', type='json', auth='public', methods=['POST'], csrf=False)
+    def visitor_requirements(self, **kw):
+        try:
+            payload = request.httprequest.get_json(force=True, silent=True) or {}
+            visitor_id = payload.get("visitor_id")
+
+            if not visitor_id:
+                return {"Status": 0, "Message": "Visitor ID is required.", "Data": {}}
+
+            visitor = request.env['visit.information'].sudo().browse(int(visitor_id))
+            if not visitor.exists():
+                return {"Status": 0, "Message": "Visitor not found.", "Data": {}}
+
+            location = visitor.location_id
+
+            return {
+                "Status": 1,
+                "Message": "Requirements",
+                "VisitorID": visitor.id,
+                "NDA": {
+                    "Enabled": location.nda,
+                    "Required": location.nda_required,
+                },
+                "Photo": {
+                    "Enabled": location.photo,
+                    "Required": location.photo_required,
+                },
+                "Questions": {
+                    "Enabled": location.question,
+                    "Required": location.question_required,
+                },
+            }
+
+        except Exception as e:
+            _logger.exception("Error in Visitor Requirements API")
+            return {"Status": -1, "Message": f"Internal Server Error: {str(e)}", "Data": {}}
+
 
     @http.route('/visitor/nda_photo', auth='public', type='json', methods=['POST'], csrf=False)
     def nda_photo(self, **kw):
@@ -433,8 +496,8 @@ class VisitorForm(http.Controller):
             data = request.get_json_data()
 
             visitor_id = data.get("visitor_id")
-            nda_answer = data.get("nda_answer")
-            photo_answer = data.get("photo_answer")  
+            nda_answer = data.get("nda_answer")   # Base64 image string
+            photo_answer = data.get("photo_answer")  # Base64 image string
 
             if not visitor_id:
                 return {"Status": 0, "Message": "Visitor ID is required"}
@@ -444,25 +507,25 @@ class VisitorForm(http.Controller):
                 return {"Status": 0, "Message": "Visitor not found"}
 
             vals = {}
-            if nda_answer is not None:
+            if nda_answer:
                 vals["nda_answer"] = nda_answer
-
             if photo_answer:
                 vals["photo_answer"] = photo_answer  
 
-            visitor.sudo().write(vals)
+            if vals:
+                visitor.sudo().write(vals)
 
-            # generate url for frontend
-            image_url = (
-                f"{request.httprequest.host_url.rstrip('/')}/web/image/visit.information/{visitor.id}/photo_answer"
-                if visitor.photo_answer else ""
-            )
+            # ✅ generate URLs for both NDA & Photo
+            base_url = request.httprequest.host_url.rstrip('/')
+            nda_url = f"{base_url}/web/image/visit.information/{visitor.id}/nda_answer" if visitor.nda_answer else ""
+            photo_url = f"{base_url}/web/image/visit.information/{visitor.id}/photo_answer" if visitor.photo_answer else ""
 
             return {
                 "Status": 1,
                 "Message": "NDA/Photo updated successfully!",
                 "VisitorID": visitor.id,
-                "PhotoURL": image_url
+                "NDA_URL": nda_url,
+                "PhotoURL": photo_url,
             }
 
         except Exception as e:
@@ -470,6 +533,40 @@ class VisitorForm(http.Controller):
 
 
 
+    @http.route('/company/getNDA', auth='public', type='http', methods=['GET'], csrf=False)
+    def get_nda(self, **kw):
+        try:
+            location_id = kw.get("location_id")
+            if not location_id:
+                return request.make_response(
+                    json.dumps({"Status": 0, "Message": "location_id is required"}),
+                    headers=[("Content-Type", "application/json")]
+                )
+
+            location = request.env["company.location"].sudo().browse(int(location_id))
+            if not location.exists():
+                return request.make_response(
+                    json.dumps({"Status": 0, "Message": "Location not found"}),
+                    headers=[("Content-Type", "application/json")]
+                )
+
+            return request.make_response(
+                json.dumps({
+                    "Status": 1,
+                    "Message": "NDA Content fetched successfully",
+                    "Location": location.name,
+                    "NDA": location.nda,
+                    "NDARequired": location.nda_required,
+                    "NDADetails": location.nda_details or ""
+                }),
+                headers=[("Content-Type", "application/json")]
+            )
+
+        except Exception as e:
+            return request.make_response(
+                json.dumps({"Status": 0, "Message": f"Error: {str(e)}"}),
+                headers=[("Content-Type", "application/json")]
+            )
 
 class EmployeeAPI(http.Controller):
 
@@ -583,13 +680,24 @@ class CompanyAPI(http.Controller):
     @http.route('/visitor/company', type='http', auth='public', methods=['GET'], csrf=False)
     def get_company(self, **kwargs):
         try:
-            # Limit the number of companies fetched to improve performance
+            # Limit the number of companies fetched
             companies = request.env['res.company'].sudo().search([], limit=100)
 
-            # Fetch only the necessary fields with `read` method, reducing overhead
-            data = companies.read(['id', 'name', 'email', 'phone', 'website'])
+            # Fetch needed fields
+            data = []
+            base_url = request.httprequest.host_url.rstrip('/')
 
-            # Return response based on whether companies were found
+            for company in companies:
+                company_data = {
+                    "id": company.id,
+                    "name": company.name,
+                    "email": company.email,
+                    "phone": company.phone,
+                    "website": company.website,
+                    "logo_url": f"{base_url}/web/image/res.company/{company.id}/logo" if company.logo else ""
+                }
+                data.append(company_data)
+
             return request.make_json_response({
                 "Status": 1 if data else 0,
                 "Message": "Companies fetched successfully" if data else "No companies found",
@@ -597,14 +705,13 @@ class CompanyAPI(http.Controller):
             })
 
         except Exception as e:
-            # Log the exception for better debugging
             _logger.exception("Error in fetching companies: %s", str(e))
-
             return request.make_json_response({
                 "Status": 0,
                 "Message": f"Error: {str(e)}",
                 "Data": []
             }, status=500)
+
 
     @http.route('/visitor/company/create', type='http', auth='public', methods=['POST'], csrf=False)
     def create_company(self, **kwargs):
@@ -810,50 +917,24 @@ class VisitorBadgeController(http.Controller):
 
     @http.route('/visitor/download_badge', type='http', auth='public', csrf=False, methods=['GET'])
     def download_badge(self, visitor_id=None, **kwargs):
-        """
-        HTTP endpoint to download visitor badge PDF.
-
-        Usage: GET /visitor/download_badge?visitor_id=32
-        """
         try:
             if not visitor_id:
-                return request.make_response(
-                    "visitor_id parameter is required",
-                    headers=[('Content-Type', 'text/plain')]
-                )
+                return request.make_response("visitor_id parameter is required")
 
             visitor = request.env['visit.information'].sudo().browse(int(visitor_id))
             if not visitor.exists():
-                return request.make_response(
-                    "Visitor not found",
-                    headers=[('Content-Type', 'text/plain')]
-                )
+                return request.make_response("Visitor not found")
 
-            # Generate PDF using existing report
-            report = request.env.ref('visitor_management.action_visit_report', raise_if_not_found=False)
+            # use sudo() so public user can read the report action
+            report = request.env.ref('visitor_management.action_visit_report', raise_if_not_found=False).sudo()
             if not report:
-                return request.make_response(
-                    "Badge report template not found",
-                    headers=[('Content-Type', 'text/plain')]
-                )
+                return request.make_response("Badge report template not found")
 
-            pdf_content, _ = request.env['ir.actions.report'].sudo()._render_qweb_pdf(
-                'visitor_management.action_visit_report', visitor.id
-            )
+            base_url = request.env['ir.config_parameter'].sudo().get_param('web.base.url')
+            # Correct way: use report.report_name
+            download_url = f"{base_url}/report/pdf/{report.report_name}/{visitor.id}"
 
-            # Return PDF as attachment
-            response = request.make_response(
-                pdf_content,
-                headers=[
-                    ('Content-Type', 'application/pdf'),
-                    ('Content-Disposition', f'attachment; filename=Visitor_Badge_{visitor.name}.pdf')
-                ]
-            )
-            return response
+            return request.make_response(download_url, headers=[('Content-Type', 'text/plain')])
 
         except Exception as e:
-            _logger.exception("Failed to generate badge PDF for visitor %s", visitor_id)
-            return request.make_response(
-                str(e),
-                headers=[('Content-Type', 'text/plain')]
-            )
+            return request.make_response(str(e), headers=[('Content-Type', 'text/plain')])

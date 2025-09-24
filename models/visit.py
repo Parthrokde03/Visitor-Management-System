@@ -43,11 +43,12 @@ class VisitInformation(models.Model):
     ("pre", "Pre-Registered"),
     ("walkin", "Walk-In")
     ], default="pre", string="Visitor Type")
-    nda_answer = fields.Boolean(string="NDA")
+    nda_answer = fields.Image(string="Signature",max_width=1024,max_height=768,verify_resolution=True)
     photo_answer = fields.Image(string="Photo",max_width=1024,max_height=768,verify_resolution=True)
     notebook_id = fields.One2many(
         'visitor.notebook.entry', 'visitor_id', string="Notebook Entries",ondelete='cascade'
     )
+    
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -229,35 +230,9 @@ class CompanyField(models.Model):
 # Inherited seprately because many2many error
 class CustomField(models.Model):
     _inherit = 'res.company'
-
-    # nda = fields.Boolean(string="NDA")
-    # photo = fields.Boolean(string="Photo")
-    # question = fields.Boolean(string="Questions")
-    # visitor_field_ids = fields.One2many(
-    #     "company.field", "company_id", string="Visitor Fields"
-    # )
     location_ids = fields.One2many(
         "company.location", "company_id", string="Locations"
-    )
-    
-    # additional_question_ids = fields.One2many(
-    #     "company.additional.question", "company_id", string="Additional Questions"
-    # )
-
-# class CompanyAdditionalQuestion(models.Model):
-#     _name = "company.additional.question"
-#     _description = "Company Additional Questions"
-#     _rec_name = "question_text"  # <- This makes Many2one show question_text
-
-
-#     location_id = fields.Many2one(
-#         "company.location", required=True, ondelete="cascade"
-#     )
-#     question_text = fields.Char("Question", required=True)
-#     question_type = fields.Selection([("checkbox", "Checkbox")], default="checkbox", string="Type")
-#     required = fields.Boolean("Required", default=False)
-
-    
+    )      
     
 class VisitorNotebookEntry(models.Model):
     _name = 'visitor.notebook.entry'
@@ -277,15 +252,25 @@ class CompanyLocation(models.Model):
 
     company_id = fields.Many2one("res.company", required=True, ondelete="cascade")
     name = fields.Char("Location", required=True)
-    nda_required = fields.Boolean("NDA")
-    photo_required = fields.Boolean("Photo")
-    question_required = fields.Boolean("Question")
+
+    # Main checkboxes
+    nda = fields.Boolean("NDA")
+    photo = fields.Boolean("Photo")
+    question = fields.Boolean("Question")
+
+    # Required checkboxes
+    nda_required = fields.Boolean("Required")
+    photo_required = fields.Boolean("Required")
+    question_required = fields.Boolean("Required")
+
+    nda_details = fields.Html()
     additional_question_ids = fields.One2many(
         "company.location.question", "location_id", string="Additional Questions"
     )
     visitor_field_ids = fields.One2many(
         "company.field", "location_id", string="Visitor Fields"
     )
+
 
 
 class CompanyLocationQuestion(models.Model):
