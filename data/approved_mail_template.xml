@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="email_visit_approved" model="mail.template">
+            <field name="name">Visitor Approved Template</field>
+            <field name="model_id" ref="visitor_management.model_visit_information"/>
+            <field name="subject">Visit Approval - "{{ object.name }}"</field>
+            <field name="email_to">{{ object.email }}</field>
+            <field name="body_html" type="html">
+                <div>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                        style="background-color: #f0f3f6; font-family: Arial, sans-serif; padding: 20px;">
+                        <tr>
+                            <td align="center">
+                                <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0"
+                                    style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                                    
+                                    <!-- Header -->
+                                    <tr>
+                                        <td align="center" style="background-color: #28a745; padding: 20px 0;">
+                                            <h1 style="color: #ffffff; font-size: 24px; margin: 0; font-weight: bold;">
+                                                Visit Approval</h1>
+                                            <p style="color: #ffffff; font-size: 14px; margin: 5px 0 0 0;">
+                                                Your visit request has been approved
+                                            </p>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Body -->
+                                    <tr>
+                                        <td style="padding: 30px; color: #333333;">
+                                            <h2 style="font-size: 22px; color: #28a745; margin-top: 0; margin-bottom: 20px; font-weight: normal;">
+                                                Hello <t t-out="object.name or ''"></t>,</h2>
+
+                                            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
+                                                We are pleased to inform you that your visit request has been <b>approved</b>.  
+                                                Here are the details of your visit:
+                                            </p>
+
+                                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                                                style="background-color: #f8f9fa; border-radius: 6px;">
+                                                <tr>
+                                                    <td style="padding: 20px;">
+                                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                                            <tr>
+                                                                <td width="30%" style="font-size: 16px; color: #555555; padding-bottom: 10px; font-weight: bold;">
+                                                                    Visitor:</td>
+                                                                <td width="70%" style="font-size: 16px; color: #333333; padding-bottom: 10px;">
+                                                                    <t t-out="object.name or ''"></t>
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td style="font-size: 16px; color: #555555; padding-bottom: 10px; font-weight: bold;">
+                                                                    Phone:</td>
+                                                                <td style="font-size: 16px; color: #333333; padding-bottom: 10px;">
+                                                                    <t t-out="object.phone or ''"></t>
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td style="font-size: 16px; color: #555555; padding-bottom: 10px; font-weight: bold;">
+                                                                    Date:</td>
+                                                                <td style="font-size: 16px; color: #333333; padding-bottom: 10px;">
+                                                                    <t t-out="object.visiting_date or ''"></t>
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td style="font-size: 16px; color: #555555; padding-bottom: 10px; font-weight: bold;">
+                                                                    Purpose:</td>
+                                                                <td style="font-size: 16px; color: #333333; padding-bottom: 10px;">
+                                                                    <t t-out="object.purpose or ''"></t>
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td style="font-size: 16px; color: #555555; padding-bottom: 10px; font-weight: bold;">
+                                                                    Employee:</td>
+                                                                <td style="font-size: 16px; color: #333333; padding-bottom: 10px;">
+                                                                    <t t-out="object.employee.name or ''"></t>
+                                                                </td>
+                                                            </tr>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                            </table>
+
+                                            <p style="font-size: 16px; line-height: 1.6; margin-top: 25px;">
+                                                Please carry a valid ID during your visit.  
+                                                If you have any questions, feel free to contact us.
+                                            </p>
+
+                                            
+                                        </td>
+                                    </tr>
+
+                                    <!-- Footer -->
+                                    <tr>
+                                        <td align="center" style="background-color: #333333; color: #999999; font-size: 12px; padding: 20px;">
+                                            <p style="margin: 0;">© <t t-out="datetime.datetime.now().year"></t> Your Company. All rights reserved.</p>
+                                            <p style="margin: 5px 0 0 0;">9987456321 | yourcompany@gmail.com </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                     <!-- <p style="font-size: 16px; line-height: 1.6; margin-top: 25px;">
+                                    You can download the approval document from the following link: <t t-out="ctx.get('download_link')"/>
+                                </p> -->
+                </div>
+            </field>
+        </record>
+    </data>
+</odoo>

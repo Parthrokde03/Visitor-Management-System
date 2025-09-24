@@ -1,0 +1,24 @@
+<odoo>
+  <data>
+  
+
+    <!-- Top menu item -->
+
+    <menuitem name="Visitor Management" id="root_menu_visitor_management"/>
+
+    <!-- menu categories -->
+
+    <!-- <menuitem name="Visitors" id="menu_visitors" parent="root_menu_visitor_management" action="action_visitor_information"/> -->
+    <menuitem name="Visits" id="menu_visits" parent="root_menu_visitor_management" action="action_visit_information"/>
+    <menuitem name="Active Visitors" id="menu_active_visitors" parent="root_menu_visitor_management"/>
+    <menuitem name="Reports" id="menu_reports" parent="root_menu_visitor_management"/>
+
+    <!-- actions -->
+
+    <!-- <menuitem name="List" id="visitor_management.menu_1_list" parent="visitor_management.menu_1"
+              action="visitor_management.action_window"/>
+    <menuitem name="Server to list" id="visitor_management" parent="visitor_management.menu_2"
+              action="visitor_management.action_server"/> -->
+
+  </data>
+</odoo>

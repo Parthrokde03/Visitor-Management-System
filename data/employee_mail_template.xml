@@ -1,0 +1,81 @@
+<odoo>
+    <data>
+        <record id="email_visit_request" model="mail.template">
+            <field name="name">Visitor Meeting Request</field>
+            <field name="model_id" ref="visitor_management.model_visit_information" />
+            <field name="subject">New Meeting Request from {{ object.name }}</field>
+            <field name="email_to">{{ object.employee.work_email }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; background-color: #f0f3f6; padding: 20px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                        <tr>
+                            <td align="center">
+                                <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0"
+                                    style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+
+                                    <!-- Header -->
+                                    <tr>
+                                        <td align="center" style="background-color: #4CAF50; padding: 20px 0;">
+                                            <h1 style="color: #ffffff; font-size: 24px; margin: 0; font-weight: bold;">
+                                                Meeting Request
+                                            </h1>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Body -->
+                                    <tr>
+                                        <td style="padding: 30px; color: #333333;">
+                                            <h2 style="font-size: 22px; margin-top: 0; margin-bottom: 20px; font-weight: normal;">
+                                                Dear <t t-out="object.employee.name or ''" />,
+                                            </h2>
+                                            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
+                                                I hope this message finds you well. You have
+                                                received a new meeting request from <b>
+                                                    <t t-out="object.name or ''" />
+                                                </b>
+                                            </p>
+
+                                            <!-- Visitor Details -->
+                                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                                                style="background-color: #f8f9fa; border-radius: 6px; margin-bottom: 25px;">
+                                                <tr>
+                                                    <td style="padding: 20px;">
+                                                        <p><b>Visitor:</b> <t t-out="object.name or ''" /></p>
+                                                        <p><b>Date:</b> <t t-out="object.visiting_date or ''" /></p>
+                                                        <p><b>Purpose:</b> <t t-out="object.purpose or ''" /></p>
+                                                    </td>
+                                                </tr>
+                                            </table>
+
+                                            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
+                                                Please review the request and take action:
+                                            </p>
+                                            <t t-set="base_url" t-value="env['ir.config_parameter'].sudo().get_param('web.base.url')" />
+
+                                            <!-- Action Button -->
+                                            <a style="color: #374151; border-style: none; margin: 0px; border-width: 0px; 
+                                                      box-sizing: border-box; background-color: #875a7b; padding: 12px 25px; 
+                                                      text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: bold;"
+                                               t-att-href="'%s/odoo/visitor/%s' % (base_url, object.id)" target="_blank">
+                                                <font style="color: #ffffff;">Take Action</font>
+                                            </a>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Footer -->
+                                    <tr>
+                                        <td align="center"
+                                            style="background-color: #333333; color: #999999; font-size: 12px; padding: 20px;">
+                                            <p style="margin: 0;">Best regards,</p>
+                                            <p style="margin: 5px 0 0 0;">[Your Company Name]</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </field>
+        </record>
+    </data>
+</odoo>

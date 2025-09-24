@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_visit_information,visit_information.visit_information,model_visit_information,base.group_user,1,1,1,1
+access_company_field,company_field.company_field,model_company_field,base.group_user,1,1,1,1
+access_visitor_notebook_entry,visitor_notebook_entry.visitor_notebook_entry,model_visitor_notebook_entry,base.group_user,1,1,1,1
+access_company_location,company_location.company_location,model_company_location,base.group_user,1,1,1,1
+access_company_location_question,company_location_question.company_location_question,model_company_location_question,base.group_user,1,1,1,1
+access_visit_cancel_wizard,visit_cancel_wizard.visit_cancel_wizard,model_visit_cancel_wizard,base.group_user,1,1,1,1

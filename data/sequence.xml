@@ -1,0 +1,11 @@
+<odoo>
+    <data>
+        <record id="seq_vist_information" model="ir.sequence">
+            <field name="name">visit Refrence</field>
+            <field name="code">visit.information</field>
+            <field name="prefix">VIS</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False" />
+        </record>
+    </data>
+</odoo>

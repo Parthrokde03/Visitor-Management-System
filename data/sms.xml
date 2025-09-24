@@ -1,0 +1,28 @@
+<odoo>
+    <data>
+        <record id="sms_system_parameter_username" model="ir.config_parameter">
+            <field name="key">visitor.sms.username</field>
+            <field name="value">sendmein</field>
+        </record>
+
+        <record id="sms_system_parameter_password" model="ir.config_parameter">
+            <field name="key">visitor.sms.password</field>
+            <field name="value">Sendme%401</field>
+        </record>
+
+        <record id="sms_system_parameter_entity_id" model="ir.config_parameter">
+            <field name="key">visitor.sms.entity_id</field>
+            <field name="value">1201159230268978726</field>
+        </record>
+       
+        <record id="sms_system_parameter_temp_id" model="ir.config_parameter">
+            <field name="key">visitor.sms.temp_id</field>
+            <field name="value">1207168905263109528</field>
+        </record>
+   
+        <record id="sms_system_parameter_source" model="ir.config_parameter">
+            <field name="key">visitor.sms.source</field>
+            <field name="value">SENDME</field>
+        </record>
+    </data>
+</odoo>

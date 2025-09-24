@@ -1,0 +1,57 @@
+<odoo>
+    <data>
+        <record id="view_company_form_custom_fields" model="ir.ui.view">
+            <field name="name">res.company.form.custom.fields</field>
+            <field name="model">res.company</field>
+            <field name="inherit_id" ref="base.view_company_form" />
+            <field name="arch" type="xml">
+                <notebook position="inside">
+
+                    <page string="Locations">
+                        <field name="location_ids">
+                            <list>
+                                <field name="name" />
+                                <field name="nda_required" />
+                                <field name="photo_required" />
+                                <field name="question_required" />
+                            </list>
+
+                            <form string="Location">
+                                <group>
+                                    <field name="name" string="Location"/>
+                                    <field name="nda_required" />
+                                    <field name="photo_required" />
+                                    <field name="question_required" />
+                                </group>
+
+                                <group string="Additional Questions">
+                                    <field name="additional_question_ids">
+                                        <list editable="bottom">
+                                            <field name="question_text" />
+                                            <field name="question_type" />
+                                            <field name="required" />
+                                        </list>
+                                    </field>
+                                </group>
+
+                                <group string="Visitor Fields">
+                                    <field name="visitor_field_ids">
+                                        <list editable="bottom">
+                                            <field name="field_id" />
+                                            <field name="label" />
+                                            <field name="field_type" />
+                                            <field name="enabled" />
+                                            <field name="required" />
+                                        </list>
+                                    </field>
+                                </group>
+                            </form>
+                        </field>
+
+                    </page>
+
+                </notebook>
+            </field>
+        </record>
+    </data>
+</odoo>

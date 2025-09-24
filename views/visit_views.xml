@@ -1,0 +1,209 @@
+<odoo>
+
+    <!-- List View -->
+    <record model="ir.ui.view" id="view_visit_information_list">
+        <field name="name">visitor.information.list</field>
+        <field name="model">visit.information</field>
+        <field name="arch" type="xml">
+            <list string="Visit" js_class="visitor_dashboard_list">
+                <field name="name" optional="show" />
+                <field name="email" optional="hide" />
+                <field name="phone" optional="hide" />
+                <field name="visiting_date" optional="hide" />
+                <field name="location_id" optional="hide" />
+                <field name="check_in" optional="hide" />
+                <field name="company" optional="hide" />
+                <field name="company_id" optional="hide" />
+                <field name="check_out" optional="hide" />
+                <field name="status" optional="hide" />
+                <field name="employee" optional="hide" />
+                <field name="purpose" optional="hide" />
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record model="ir.ui.view" id="view_visit_information_form">
+        <field name="name">visit.information.form</field>
+        <field name="model">visit.information</field>
+        <field name="arch" type="xml">
+            <form string="Visit">
+                <header>
+                    <field name="status" widget="statusbar"
+                        statusbar_visible="pending,approved,cancelled" />
+                    <button name="action_approved" type="object" string="Approve"
+                        invisible="status != 'pending'" class="oe_highlight" />
+                    <button name="action_cancelled" type="object" string="Cancel"
+                        invisible="status == 'approved'" />
+                </header>
+                <sheet>
+                    <!-- 📌 Avatar Photo Field -->
+                    <field name="photo_answer" widget="image" class="oe_avatar"
+                        options="{'preview_image': 'photo_answer'}" />
+
+                    <!-- Visitor Details -->
+                    <!-- <div class="oe_title mb24">
+                        <h1>
+                            <field name="name" placeholder="Visitor Name" />
+                        </h1>
+                    </div> -->
+
+                    <group>
+                        <group>
+                            <field name="name" />
+                            <field name="email" />
+                            <field name="phone" />
+                            <field name="visiting_date" />
+                            <field name="company" />
+                            <field name="location_id" />
+                            <field name="employee" />
+                            <field name="company_id" />
+                            <field name="purpose" />
+                            <field name="instructions" />
+                        </group>
+                        <group>
+                            <field name="check_in" />
+                            <field name="check_out" />
+                        </group>
+                    </group>
+                    <notebook>
+                    <page string="Visitor Questions">
+                        <field name="notebook_id">
+                            <list editable="bottom">
+                                <field name="question_id"/>
+                                <!-- <field name="answer_text"/>
+                                <field name="answer_bool"/> -->
+                                <field name="answer_selection"/>
+                            </list>
+                        </field>
+                    </page>
+                </notebook>
+                </sheet>
+                <chatter />
+            </form>
+        </field>
+    </record>
+
+
+    <!-- Kanban View -->
+    <record model="ir.ui.view" id="view_visit_information_kanban">
+        <field name="name">visit.information.kanban</field>
+        <field name="model">visit.information</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="status">
+                <field name="name" />
+                <field name="visiting_date" />
+                <field name="employee" />
+                <field name="company" />
+                <field name="purpose" />
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="o_kanban_record o_kanban_card shadow-sm rounded p-3 mb-2">
+                            <!-- <div class="o_kanban_primary_bottom"> -->
+                            <div>
+                                <strong>Name: </strong>
+                                <field name="name" />
+                            </div>
+                            <!-- <div><field name="purpose"/></div> -->
+                            <div>
+                                <strong>Employee: </strong>
+                                <field name="employee" />
+                            </div>
+                            <div>
+                                <strong>Company: </strong>
+                                <field name="company" />
+                            </div>
+                            <!-- <div>
+                                <field name="company_id" />
+                            </div> -->
+                            <div>
+                                <strong>Date: </strong>
+                                <field name="visiting_date" />
+                            </div>
+                            <!-- Button -->
+                            <!-- <div class="mt-2">
+                                <span class="badge"
+                                      t-attf-class="badge 
+                                        #{record.status.raw_value == 'pending' ? 'bg-primary' : 
+                                          record.status.raw_value == 'approved' ? 'bg-success' : 'bg-danger'}">
+                                    <field name="status"/>
+                                </span>
+                            </div> -->
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Graph View -->
+    <record id="view_visit_information_graph" model="ir.ui.view">
+        <field name="name">visit.information.graph</field>
+        <field name="model">visit.information</field>
+        <field name="arch" type="xml">
+            <graph string="Visitors by Employee" type="bar">
+                <!-- x-axis -->
+                <field name="employee" type="row" />
+                <!-- y-axis -->
+                <field name="id" type="measure" />
+            </graph>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_visitor_management_search" model="ir.ui.view">
+        <field name="name">visitor.information.search</field>
+        <field name="model">visit.information</field>
+        <field name="arch" type="xml">
+            <search string="Search Visits">
+                <field name="name" string="Name" />
+                <field name="email" string="Email" />
+                <field name="phone" string="Phone" />
+
+                <filter string="Pending" name="filter_pending" domain="[('status','=','pending')]" />
+                <filter string="Approved" name="filter_approved"
+                    domain="[('status','=','approved')]" />
+                <filter string="Cancelled" name="filter_cancelled"
+                    domain="[('status','=','cancelled')]" />
+
+                <group expand="1" string="Group By">
+                    <filter string="Status" name="group_status" context="{'group_by':'status'}" />
+                    <filter string="Employee" name="group_employee"
+                        context="{'group_by':'employee'}" />
+                    <filter string="Date" name="group_date" context="{'group_by':'visiting_date'}" />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- NDA and Photo
+    <record id="view_company_form_inherit_nda_photo" model="ir.ui.view">
+        <field name="name">res.company.form.inherit.nda.photo</field>
+        <field name="model">res.company</field>
+        <field name="inherit_id" ref="base.view_company_form" />
+        <field name="arch" type="xml">
+
+
+            <xpath expr="//field[@name='currency_id']" position="after">
+                <field name="nda" />
+                <field name="photo" />
+                <field name="question" />
+            </xpath>
+
+        </field>
+    </record> -->
+
+    <!-- Action -->
+    <record id="action_visit_information" model="ir.actions.act_window">
+        <field name="name">Visit</field>
+        <field name="res_model">visit.information</field>
+        <field name="path">visitor</field>
+        <field name="view_mode">kanban,list,form,graph</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Visitor
+            </p>
+        </field>
+    </record>
+
+</odoo>

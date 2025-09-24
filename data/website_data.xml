@@ -1,0 +1,24 @@
+<odoo>
+    <data noupdate="1">
+
+        <!-- Website Page -->
+        <record id="visitor_page" model="website.page">
+            <field name="url">/visitor</field>
+            <field name="is_published">True</field>
+            <!-- Link page to template -->
+            <field name="view_id" ref="visitor_management.visitor_register"/>
+            <field name="track">True</field>
+            <field name="website_meta_description">This is the visitor registration page of the website</field>
+        </record>
+
+        <!-- Website Menu -->
+        <record id="menu_visitor" model="website.menu">
+            <field name="name">Visitor</field>
+            <field name="url">/visitor</field>
+            <field name="page_id" ref="visitor_management.visitor_page"/>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" type="int">60</field>
+        </record>
+
+    </data>
+</odoo>

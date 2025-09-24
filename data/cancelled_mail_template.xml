@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="email_visit_cancelled" model="mail.template">
+            <field name="name">Visit Cancellation</field>
+            <field name="model_id" ref="visitor_management.model_visit_information"/>
+            <field name="subject">Visit Cancellation - "{{ object.name }}"</field>
+            <field name="email_to">{{ object.email }}</field>
+            <field name="body_html" type="html">
+                <div>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                        style="background-color: #f0f3f6; font-family: Arial, sans-serif; padding: 20px;">
+                        <tr>
+                            <td align="center">
+                                <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0"
+                                    style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                                    
+                                    <!-- Header -->
+                                    <tr>
+                                        <td align="center" style="background-color: #dc3545; padding: 20px 0;">
+                                            <h1 style="color: #ffffff; font-size: 24px; margin: 0; font-weight: bold;">
+                                                Visit Cancelled</h1>
+                                            <p style="color: #ffffff; font-size: 14px; margin: 5px 0 0 0;">
+                                                Your scheduled visit has been cancelled
+                                            </p>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Body -->
+                                    <tr>
+                                        <td style="padding: 30px; color: #333333;">
+                                            <h2 style="font-size: 22px; color: #dc3545; margin-top: 0; margin-bottom: 20px; font-weight: normal;">
+                                                Hello <t t-out="object.name or ''"></t>,</h2>
+
+                                            <p style="font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
+                                                We regret to inform you that your scheduled visit has been <b>cancelled</b>.  
+                                                Below are the details of your cancelled visit:
+                                            </p>
+
+                                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                                                style="background-color: #f8f9fa; border-radius: 6px;">
+                                                <tr>
+                                                    <td style="padding: 20px;">
+                                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                                            <tr>
+                                                                <td width="30%" style="font-size: 16px; color: #555555; padding-bottom: 10px; font-weight: bold;">
+                                                                    Visitor:</td>
+                                                                <td width="70%" style="font-size: 16px; color: #333333; padding-bottom: 10px;">
+                                                                    <t t-out="object.name or ''"></t>
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td style="font-size: 16px; color: #555555; padding-bottom: 10px; font-weight: bold;">
+                                                                    Email:</td>
+                                                                <td style="font-size: 16px; color: #333333; padding-bottom: 10px;">
+                                                                    <t t-out="object.email or ''"></t>
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td style="font-size: 16px; color: #555555; padding-bottom: 10px; font-weight: bold;">
+                                                                    Phone:</td>
+                                                                <td style="font-size: 16px; color: #333333; padding-bottom: 10px;">
+                                                                    <t t-out="object.phone or ''"></t>
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td style="font-size: 16px; color: #555555; padding-bottom: 10px; font-weight: bold;">
+                                                                    Reasone:</td>
+                                                                <td style="font-size: 16px; color: #333333; padding-bottom: 10px;">
+                                                                    <t t-out="object.cancellation_reason or ''"></t>
+                                                                </td>
+                                                            </tr>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                            </table>
+
+                                            <p style="font-size: 16px; line-height: 1.6; margin-top: 25px;">
+                                                We apologize for any inconvenience caused.  
+                                                If needed, you may reschedule your visit by contacting us.
+                                            </p>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Footer -->
+                                    <tr>
+                                        <td align="center" style="background-color: #333333; color: #999999; font-size: 12px; padding: 20px;">
+                                            <p style="margin: 0;">© <t t-out="datetime.datetime.now().year"></t> ${object.env.company.name}. All rights reserved.</p>
+                                            <p style="margin: 5px 0 0 0;">${object.env.company.phone or ''} | ${object.env.company.email or ''}</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </field>
+        </record>
+    </data>
+</odoo>

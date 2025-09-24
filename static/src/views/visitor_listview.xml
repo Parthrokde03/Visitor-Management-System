@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<templates>
+    <t t-name="visitor_management.VisitorListView" t-inherit="web.ListRenderer"
+        t-inherit-mode="primary">
+        <xpath expr="//div[hasclass('o_list_renderer')]" position="before">
+            <VisitorDashboard list="props.list" />
+        </xpath>
+    </t>
+</templates>
