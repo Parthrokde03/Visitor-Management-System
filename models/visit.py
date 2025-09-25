@@ -216,7 +216,7 @@ class CompanyField(models.Model):
     )
     field_id = fields.Many2one(
         "ir.model.fields",
-        domain="[('model_id.model', '=', 'visit.information')]"
+        domain="[('model_id.model', '=', 'visit.information'),('state','in',['manual','base'])]"
     )
     label = fields.Char("Label")
     enabled = fields.Boolean("Enabled", default=True)

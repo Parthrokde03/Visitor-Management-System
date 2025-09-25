@@ -7,7 +7,7 @@ from odoo import http
 from odoo.http import Response, request
 from datetime import date, datetime, timedelta
 from odoo import _
-import base64
+from werkzeug.exceptions import NotFound
 from odoo.addons.bus.models.bus import dispatch
 
 _logger = logging.getLogger(__name__)
@@ -515,7 +515,7 @@ class VisitorForm(http.Controller):
             if vals:
                 visitor.sudo().write(vals)
 
-            # ✅ generate URLs for both NDA & Photo
+            # generate URLs for both NDA & Photo
             base_url = request.httprequest.host_url.rstrip('/')
             nda_url = f"{base_url}/web/image/visit.information/{visitor.id}/nda_answer" if visitor.nda_answer else ""
             photo_url = f"{base_url}/web/image/visit.information/{visitor.id}/photo_answer" if visitor.photo_answer else ""
@@ -624,7 +624,7 @@ class VisitorFieldAPI(http.Controller):
             location = None
             if location_id:
                 location = request.env['company.location'].sudo().browse(int(location_id))  
-                # 👆 replace `company.location` with your actual model name for locations
+                # replace `company.location` with your actual model name for locations
                 if not location.exists() or location.company_id.id != company.id:
                     return request.make_json_response({
                         "Status": 0,
@@ -760,9 +760,18 @@ class CompanyAPI(http.Controller):
         data = [{
             "id": loc.id,
             "name": loc.name,
-            "nda_required": loc.nda_required,
-            "photo_required": loc.photo_required,
-            "question_required": loc.question_required,
+            "NDA": {
+                "Enabled": loc.nda,
+                "Required": loc.nda_required,
+            },
+            "Photo": {
+                "Enabled": loc.photo,
+                "Required": loc.photo_required,
+            },
+            "Questions": {
+                "Enabled": loc.question,
+                "Required": loc.question_required,
+            },
         } for loc in locations]
 
         return request.make_response(
@@ -915,26 +924,29 @@ class VisitorQuestionController(http.Controller):
 
 class VisitorBadgeController(http.Controller):
 
-    @http.route('/visitor/download_badge', type='http', auth='public', csrf=False, methods=['GET'])
-    def download_badge(self, visitor_id=None, **kwargs):
+    @http.route('/visitor/badge/<int:visitor_id>', type='http', auth='public', csrf=False, methods=['GET'])
+    def visitor_badge(self, visitor_id, **kwargs):
         try:
-            if not visitor_id:
-                return request.make_response("visitor_id parameter is required")
-
-            visitor = request.env['visit.information'].sudo().browse(int(visitor_id))
+            # Load record with sudo so we can at least render the report itself
+            visitor = request.env['visit.information'].sudo().browse(visitor_id)
             if not visitor.exists():
-                return request.make_response("Visitor not found")
+                raise NotFound("Visitor not found")
 
-            # use sudo() so public user can read the report action
-            report = request.env.ref('visitor_management.action_visit_report', raise_if_not_found=False).sudo()
-            if not report:
-                return request.make_response("Badge report template not found")
+            report_svc = request.env['ir.actions.report'].sudo()
+            pdf, _ = report_svc._render("visitor_management.action_visit_report", [visitor.id])
 
-            base_url = request.env['ir.config_parameter'].sudo().get_param('web.base.url')
-            # Correct way: use report.report_name
-            download_url = f"{base_url}/report/pdf/{report.report_name}/{visitor.id}"
+            filename = f"Visitor_Pass_{visitor.display_name or visitor.name or visitor.id}.pdf"
+            return request.make_response(
+                pdf,
+                headers=[
+                    ('Content-Type', 'application/pdf'),
+                    ('Content-Length', str(len(pdf))),
+                    ('Content-Disposition', f'inline; filename="{filename}"'),
+                ],
+            )
 
-            return request.make_response(download_url, headers=[('Content-Type', 'text/plain')])
-
-        except Exception as e:
+        except NotFound as e:
             return request.make_response(str(e), headers=[('Content-Type', 'text/plain')])
+        except Exception as e:
+            _logger.exception("Error generating visitor badge for id=%s", visitor_id)
+            return request.make_response(f"Error generating badge: {e}", headers=[('Content-Type', 'text/plain')])

@@ -1,4 +1,3 @@
-
 <odoo>
   <!-- 1) Paperformat: 100 x 150 mm label, no margins -->
   <record id="paperformat_visitor_pass" model="report.paperformat">
@@ -20,7 +19,7 @@
   <record id="action_visit_report" model="ir.actions.report">
     <field name="name">Visitor Pass</field>
     <field name="model">visit.information</field>
-    <field name="report_type">qweb-html</field>
+    <field name="report_type">qweb-pdf</field>
     <field name="report_name">visitor_management.badge_report</field>
     <field name="report_file">visitor_management.badge_report</field>
     <field name="binding_model_id" ref="visitor_management.model_visit_information" />
@@ -35,11 +34,9 @@
       <t t-foreach="docs" t-as="o">
         <t t-call="web.external_layout">
           <div class="page">
-            <style>
-              @page { size: 150mm 100mm; margin: 0; }
-              .page { width:150mm !important; min-height:100mm !important; height:100mm !important;
-              margin:0 !important; padding:0 !important; }
-              <!-- * {
+            <style> @page { size: 150mm 100mm; margin: 0; } .page { width:150mm !important;
+              min-height:100mm !important; height:100mm !important; margin:0 !important; padding:0
+              !important; } <!-- * {
   border: 0 !important;
   outline: 0 !important;
   box-shadow: 0 !important;
@@ -49,82 +46,26 @@
 div, table, tr, td, th {
   border: 0 !important;
   outline: 0 !important;
-} -->
-
-
-
-
-
-
-
-
-              .badge-page{ width:150mm; 
-                height:100mm;
-                box-sizing:border-box; 
-                padding:5mm; }
-              .badge-card{
-              width:100%; 
-              height:100%;
-              border:0.8mm solid #111; 
-              border-radius:4mm;
-              box-sizing:border-box; 
-              
-              padding:4mm 5mm; 
-              position:relative; 
-              font-family: Arial, Helvetica, sans-serif;
-              }
-
-              /* wkhtml-friendly table layout */
-              .tbl{ width:100%; height:100%; 
-                border-collapse:collapse;
-                 }
-              .tbl td{ vertical-align:top; }
-              .td-left{ width:60%; padding-right:4mm; }
-              .td-right{ width:40%; }
-             
-
-
-
-              .photo{ width:35mm; height:35mm; border-radius:50%; overflow:hidden; }
-              .photo img{ width:100%; height:100%; object-fit:cover; display:block; }
-
-              .v-name{ font-size:6mm; line-height:1.05; font-weight:800; margin:1mm 0 0; }
-              .v-lines{ font-size:3.3mm; line-height:1.25; }
-              .v-lines p{ margin:0.8mm 0; }
-
-              .logo-box{
-              height:18mm; border:0.5mm dashed #bdbdbd; border-radius:2mm;
-              text-align:center; box-sizing:border-box; padding:1mm;
-              }
-              .logo-box img{ max-width:100%; max-height:100%; display:inline-block; }
-
-              .qr-box{
-              width:40mm; height:40mm; border:0.6mm solid #000; border-radius:1mm;
-              padding:1mm; box-sizing:border-box; position:absolute; right:7mm; bottom:7mm;
-              }
-              .qr-box img{ width:100%; height:100%; display:block; }
-
-              .page, .badge-page, .badge-card { page-break-inside: avoid; }
-              .signature_container {
-              margin-top: 15px;
-              display: flex;
-              align-items: center;
-              gap: 10px;
-              }
-              .signature_label {
-              font-size: small;
-              color: gray;
-              font-weight: bold;
-              white-space: nowrap;
-              }
-              .signature_box {
-              width: 180px;
-              height: 35px;
-              border: 1px solid #999 !important;
-              border-radius: 4px !important;
-              display: inline-block;
-              }
-            </style>
+} --> .badge-page{ width:150mm; height:100mm; box-sizing:border-box;
+              padding:5mm; } .badge-card{ width:100%; height:100%; border:0.8mm solid #111;
+              border-radius:4mm; box-sizing:border-box; padding:4mm 5mm; position:relative;
+              font-family: Arial, Helvetica, sans-serif; } /* wkhtml-friendly table layout */ .tbl{
+              width:100%; height:100%; border-collapse:collapse; } .tbl td{ vertical-align:top; }
+              .td-left{ width:60%; padding-right:4mm; } .td-right{ width:40%; } .photo{ width:35mm;
+              height:35mm; border-radius:50%; overflow:hidden; } .photo img{ width:100%;
+              height:100%; object-fit:cover; display:block; } .v-name{ font-size:6mm;
+              line-height:1.05; font-weight:800; margin:1mm 0 0; } .v-lines{ font-size:3.3mm;
+              line-height:1.25; } .v-lines p{ margin:0.8mm 0; } .logo-box{ height:18mm; border:0.5mm
+              dashed #bdbdbd; border-radius:2mm; text-align:center; box-sizing:border-box;
+              padding:1mm; } .logo-box img{ max-width:100%; max-height:100%; display:inline-block; }
+              .qr-box{ width:40mm; height:40mm; border:0.6mm solid #000; border-radius:1mm;
+              padding:1mm; box-sizing:border-box; position:absolute; right:7mm; bottom:7mm; }
+              .qr-box img{ width:100%; height:100%; display:block; } .page, .badge-page, .badge-card
+              { page-break-inside: avoid; } .signature_container { margin-top: 15px; display: flex;
+              align-items: center; gap: 10px; } .signature_label { font-size: small; color: gray;
+              font-weight: bold; white-space: nowrap; } .signature_box { width: 180px; height: 35px;
+              border: 1px solid #999 !important; border-radius: 4px !important; display:
+              inline-block; } </style>
 
             <div class="badge-page">
               <div class="badge-card">
@@ -133,8 +74,14 @@ div, table, tr, td, th {
                     <td class="td-left">
                       <div class="photo">
                         <!-- safer to serve as PNG via /web/image (optional but recommended) -->
-                        <img t-if="o.photo_answer"
-                          t-att-src="'/web/image/visit.information/%s/photo_answer?mimetype=image/png' % o.id" />
+                        <!-- <img t-if="o.photo_answer"
+                          t-att-src="'/web/image/visit.information/%s/photo_answer?mimetype=image/png' % o.id" /> -->
+                        <img
+                          t-attf-src="data:image/png;base64,{{o.photo_answer}}"
+                          alt="Profile Picture"
+                          class="logo"
+                          t-if="o.photo_answer"
+                        />
                       </div>
 
                       <div class="v-name">
@@ -158,17 +105,24 @@ div, table, tr, td, th {
                       </div> -->
                       <div>
                         <span class="signature_label">Signature of employee:</span>
-                        <div class="signature_box" ></div>
+                        <div class="signature_box"></div>
                       </div>
                     </td>
 
                     <td class="td-right">
-                      <t t-set="company" t-value="o.company_id or env.company" />
+                      <!-- <t t-set="company" t-value="o.company_id or env.company" /> -->
                       <div class="logo-box">
                         <!-- Check if company logo exists and render it -->
-                        <img t-if="company and company.logo"
-                          t-att-src="'%s/web/image/res.company/%s/logo?mimetype=image/png' % (env['ir.config_parameter'].sudo().get_param('web.base.url'), company.id)" />
-                        <t t-if="not (company and company.logo)">Your Logo Here</t>
+                        <!-- <img t-if="company and company.logo"
+                          t-att-src="'%s/web/image/res.company/%s/logo?mimetype=image/png' %
+                        (env['ir.config_parameter'].sudo().get_param('web.base.url'), company.id)"
+                        /> -->
+                        <img t-if="o.company_id and o.company_id.logo"
+                          t-attf-src="data:image/png;base64,{{o.company_id.logo}}" class="logo"
+                          alt="Company Logo" />
+
+
+                        <t t-if="not (o.company_id and o.company_id.logo)">Your Logo Here</t>
                       </div>
                     </td>
 
