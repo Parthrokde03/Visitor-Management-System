@@ -68,6 +68,8 @@
                             <field name="check_in" />
                             <field name="check_out" />
                         </group>
+                        <group name="custom_fields"> 
+                        </group>
                     </group>
                     <notebook>
                     <page string="Visitor Questions">
@@ -84,6 +86,18 @@
                 </sheet>
                 <chatter />
             </form>
+        </field>
+    </record>
+
+
+        <record model="ir.ui.view" id="view_visit_information_custom_form">
+        <field name="name">visit.information.custom.form</field>
+        <field name="model">visit.information</field>
+        <field name="inherit_id" ref="visitor_management.view_visit_information_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='custom_fields']" position="inside">
+               
+            </xpath>
         </field>
     </record>
 

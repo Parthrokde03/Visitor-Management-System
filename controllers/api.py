@@ -166,7 +166,11 @@ class Otp(http.Controller):
             _logger.info(f"Incoming OTP Payload: {payload}")
 
             if not mobile or not otp:
-                return {"Status": 0, "Message": "Invalid request. Mobile and OTP are required.", "Data": {}}
+                return {
+                    "Status": 0,
+                    "Message": "Invalid request. Mobile and OTP are required.",
+                    "Data": {}
+                }
 
             # search visitor for today
             today, tomorrow = self._get_today_range()
@@ -175,33 +179,42 @@ class Otp(http.Controller):
                 ('visiting_date', '>=', today),
                 ('visiting_date', '<', tomorrow)
             ], limit=1)
-
-            # If no visitor OR visitor record has no name → treat as new user
-            if not visitor or not visitor.name:
+            
+           
+            if not otp.isdigit() or int(otp) != int(visitor.otp_code or 0):
                 return {
-                    "Status": 1,
-                    "Message": "New user - please register",
-                    "Data": {},
-                    "Newuser": 1
+                    "Status": 0,
+                    "Message": "Invalid OTP!",
+                    "Data": {}
                 }
 
-            # OTP check
-            if not otp.isdigit() or int(otp) != int(visitor.otp_code or 0):
-                return {"Status": 0, "Message": "Invalid OTP!", "Data": {}}
+           
+            if not visitor or not visitor.name:
+                return {"Status": 1, "Message": "New user - please register", "Data": {}, "Newuser": 1}
 
+            
             if visitor.status != "approved":
-                return {"Status": 0, "Message": f"Visitor not approved yet (status={visitor.status}).", "Data": {}}
+                return {
+                    "Status": 0,
+                    "Message": f"Visitor not approved yet (status={visitor.status}).",
+                    "Data": {}
+                }
 
+            # 5️⃣ Success
             return {
                 "Status": 1,
                 "Message": "OTP verified successfully.",
                 "VisitorID": visitor.id
             }
 
-
         except Exception as e:
             _logger.exception("Error in OTP verification")
-            return {"Status": -1, "Message": f"Internal Server Error: {str(e)}", "Data": {}}
+            return {
+                "Status": -1,
+                "Message": f"Internal Server Error: {str(e)}",
+                "Data": {}
+            }
+
 
 
     @http.route('/visitor/checkin_out', type='json', auth='public', methods=['POST'], csrf=False)
@@ -342,49 +355,55 @@ class VisitorForm(http.Controller):
     @http.route('/visitor/submitForm', auth='public', type='json', methods=['POST'], csrf=False)
     def submit_form(self, **kw):
         try:
-            data = request.get_json_data()
+            data = request.get_json_data() or {}
+            
+            # data = {"name": 'abc', 'company_id': '2'}
 
-            name = data.get("name")
-            email = data.get("email")
-            phone = data.get("phone")     
-            company = data.get("company")   
-            location_id = data.get("location_id")
-            employee = data.get("employee")
-            purpose = data.get("purpose")
+            # name = data.get("name")
+            # email = data.get("email")
+            # phone = data.get("phone")     
+            # company = data.get("company")   
+            # location_id = data.get("location_id")
+            # employee = data.get("employee")
+            # purpose = data.get("purpose")
+            # custom_answers = data.get("custom_answers", [])
 
-            if not name or not phone:
-                return {"Status": 0, "Message": "Name and Phone are required."}
+            # if not name or not phone:
+            #     return {"Status": 0, "Message": "Name and Phone are required."}
 
-            emp = request.env["hr.employee"].sudo().browse(int(employee)) if employee else False
+            # emp = request.env["hr.employee"].sudo().browse(int(employee)) if employee else False
 
-            today, tomorrow = self._get_today_range()
-            visitor = request.env["visit.information"].sudo().search([
-                ('phone', '=', phone),
-                ('visiting_date', '>=', today),
-                ('visiting_date', '<', tomorrow)
-            ], limit=1)
+            # today, tomorrow = self._get_today_range()
+            # visitor = request.env["visit.information"].sudo().search([
+            #     ('phone', '=', phone),
+            #     ('visiting_date', '>=', today),
+            #     ('visiting_date', '<', tomorrow)
+            # ], limit=1)
+            vals = {}
+            for key, value in data.items():
+                vals[key] = value
+            visitor = request.env["visit.information"].sudo().create(vals)
 
-            vals = {
-                "name": name,
-                "email": email,
-                "company": company,          
-                "location_id": int(location_id) if location_id else False,
-                "employee": int(employee) if employee else False,
-                "purpose": purpose,
-                "status": "pending",
-                "visit_type": "walkin",
-                "company_id": emp.company_id.id if emp else request.env.company.id  
-            }
+            # vals = {
+            #     "name": name,
+            #     "email": email,
+            #     "company": company,          
+            #     "location_id": int(location_id) if location_id else False,
+            #     "employee": int(employee) if employee else False,
+            #     "purpose": purpose,
+            #     "status": "pending",
+            #     "visit_type": "walkin",
+            #     "company_id": emp.company_id.id if emp else request.env.company.id  
+            # }
 
-            if visitor:
-                visitor.sudo().write(vals)
-            else:
-                vals.update({
-                    "phone": phone,
-                    "visiting_date": datetime.now(),
-                })
-                visitor = request.env["visit.information"].sudo().create(vals)
-
+            # if visitor:
+            #     visitor.sudo().write(vals)
+            # else:
+            #     vals.update({
+            #         "phone": phone,
+            #         "visiting_date": datetime.now(),
+            #     })
+                # visitor = request.env["visit.information"].sudo().create(vals)
             return {
                 "Status": 1,
                 "Message": "Form submitted successfully!",

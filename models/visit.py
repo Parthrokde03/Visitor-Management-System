@@ -49,6 +49,38 @@ class VisitInformation(models.Model):
         'visitor.notebook.entry', 'visitor_id', string="Notebook Entries",ondelete='cascade'
     )
     
+    @api.model
+    def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
+        _logger.info("fields_view_get called for visit.information")
+        result = super().fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar, submenu=submenu)
+ 
+        if view_type == 'form':
+            doc = etree.XML(result['arch'])
+ 
+            # Find your target <group> in the inherited view
+            group = doc.xpath("//group[@name='custom_fields']")
+            if group:
+                group = group[0]
+                existing_fields = {node.get("name") for node in group.xpath(".//field")}
+ 
+                # Get all fields of this model
+                all_fields = self._fields.keys()
+ 
+                # Filter out technical ones
+                auto_fields = [f for f in all_fields if f not in existing_fields and not f.startswith("_")]
+ 
+                # Dynamically add missing fields
+                for field in auto_fields:
+                    # Only add custom fields or new fields you want
+                    if self._fields[field].manual:  # `manual=True` means created via UI
+                        new_field = etree.Element("field", name=field)
+                        group.append(new_field)
+ 
+                result['arch'] = etree.tostring(doc, encoding='unicode')
+ 
+        return result
+
+    
 
     @api.model_create_multi
     def create(self, vals_list):
