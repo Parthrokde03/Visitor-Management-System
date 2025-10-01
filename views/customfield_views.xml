@@ -20,6 +20,7 @@
                             </list>
 
                             <form string="Location">
+
                                 <sheet>
                                     <group>
                                         <field name="name" string="Location" />
@@ -58,7 +59,10 @@
                                     <group string="Visitor Fields">
                                         <field name="visitor_field_ids" mode="list">
                                             <list editable="bottom">
-                                                <field name="field_id" />
+                                                <field name="field_id"
+                                                    context="{'default_model_id': visitor_model_id}"
+                                                    domain="[('model_id', '=', visitor_model_id), ('state','in',['manual','base'])]" />
+                                                <field name="visitor_model_id"/>
                                                 <field name="label" />
                                                 <field name="field_type" />
                                                 <field name="enabled" />
@@ -66,6 +70,7 @@
                                             </list>
                                         </field>
                                     </group>
+
 
                                     <group string="NDA Content">
                                         <field name="nda_details" widget="html"

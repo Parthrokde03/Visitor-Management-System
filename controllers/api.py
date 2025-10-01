@@ -1,14 +1,21 @@
 # -*- coding: utf-8 -*-
+from dataclasses import fields
 import json
 import random
 import requests
 import logging
-from odoo import http
+from odoo import http, fields as odoo_fields
 from odoo.http import Response, request
 from datetime import date, datetime, timedelta
 from odoo import _
 from werkzeug.exceptions import NotFound
 from odoo.addons.bus.models.bus import dispatch
+
+
+# ...
+
+now = odoo_fields.Datetime.now()
+
 
 _logger = logging.getLogger(__name__)
 
@@ -346,76 +353,88 @@ class SMSUtils:
 
 
 class VisitorForm(http.Controller):
- 
+
     def _get_today_range(self):
+        from datetime import datetime, timedelta
         today = datetime.combine(datetime.today(), datetime.min.time())
         tomorrow = today + timedelta(days=1)
         return today, tomorrow
+
+    def _find_today_visitor(self, phone):
+        today, tomorrow = self._get_today_range()
+        return request.env['visit.information'].sudo().search([
+            ('phone', '=', phone),
+            ('visiting_date', '>=', today),
+            ('visiting_date', '<', tomorrow)
+        ], limit=1)
+
+    def _normalize_vals(self, model, data):
+        """Keep only real model fields; coerce simple m2m lists to (6,0,ids)."""
+        fields_map = model._fields
+        vals = {}
+        for k, v in data.items():
+            if k == 'company_id':
+                continue  # never trust from client
+            if k not in fields_map:
+                continue  # ignore unknown dynamic keys
+
+            f = fields_map[k]
+            # Many2one: allow {"id": 5} or 5 as value
+            if f.type == 'many2one':
+                if isinstance(v, dict) and 'id' in v:
+                    vals[k] = int(v['id']) if v['id'] else False
+                else:
+                    vals[k] = int(v) if v else False
+
+            # Many2many/One2many:
+            elif f.type in ('many2many', 'one2many'):
+                # Accept full Odoo command list if caller already sends it
+                if isinstance(v, list) and v and isinstance(v[0], (list, tuple)) and len(v[0]) >= 2:
+                    vals[k] = v
+                # Accept simple list of IDs for M2M and turn into (6,0,ids)
+                elif f.type == 'many2many' and isinstance(v, list) and all(isinstance(x, (int, str)) for x in v):
+                    vals[k] = [(6, 0, [int(x) for x in v])]
+                else:
+                    # For O2M you typically need command tuples; ignore if not valid
+                    pass
+
+            # Datetime/Date: let Odoo coerce ISO strings; if you want to force "now", do it server-side
+            else:
+                vals[k] = v
+        return vals
+
 
     @http.route('/visitor/submitForm', auth='public', type='json', methods=['POST'], csrf=False)
     def submit_form(self, **kw):
         try:
             data = request.get_json_data() or {}
-            
-            # data = {"name": 'abc', 'company_id': '2'}
+            vals = {k: v for k, v in data.items() if k != 'company_id'}
 
-            # name = data.get("name")
-            # email = data.get("email")
-            # phone = data.get("phone")     
-            # company = data.get("company")   
-            # location_id = data.get("location_id")
-            # employee = data.get("employee")
-            # purpose = data.get("purpose")
-            # custom_answers = data.get("custom_answers", [])
+            employee_id = vals.get('employee') or vals.get('employee_id')
+            if employee_id:
+                emp = request.env['hr.employee'].sudo().browse(int(employee_id))
+                if emp.exists():
+                    vals['company_id'] = emp.company_id.id
 
-            # if not name or not phone:
-            #     return {"Status": 0, "Message": "Name and Phone are required."}
+            phone = vals.get('phone') or data.get('mobileNumber')
+            visitor = self._find_today_visitor(phone) if phone else None
 
-            # emp = request.env["hr.employee"].sudo().browse(int(employee)) if employee else False
+            now = odoo_fields.Datetime.now()
 
-            # today, tomorrow = self._get_today_range()
-            # visitor = request.env["visit.information"].sudo().search([
-            #     ('phone', '=', phone),
-            #     ('visiting_date', '>=', today),
-            #     ('visiting_date', '<', tomorrow)
-            # ], limit=1)
-            vals = {}
-            for key, value in data.items():
-                vals[key] = value
-            visitor = request.env["visit.information"].sudo().create(vals)
+            if visitor:
+                if not visitor.visiting_date:
+                    vals.setdefault('visiting_date', now)
+                visitor.sudo().write(vals)
+            else:
+                vals.setdefault('visiting_date', now)
+                visitor = request.env['visit.information'].sudo().create(vals)
 
-            # vals = {
-            #     "name": name,
-            #     "email": email,
-            #     "company": company,          
-            #     "location_id": int(location_id) if location_id else False,
-            #     "employee": int(employee) if employee else False,
-            #     "purpose": purpose,
-            #     "status": "pending",
-            #     "visit_type": "walkin",
-            #     "company_id": emp.company_id.id if emp else request.env.company.id  
-            # }
-
-            # if visitor:
-            #     visitor.sudo().write(vals)
-            # else:
-            #     vals.update({
-            #         "phone": phone,
-            #         "visiting_date": datetime.now(),
-            #     })
-                # visitor = request.env["visit.information"].sudo().create(vals)
-            return {
-                "Status": 1,
-                "Message": "Form submitted successfully!",
-                "VisitorID": visitor.id,
-            }
-
+            return {"Status": 1, "Message": "Form submitted successfully!", "VisitorID": visitor.id}
         except Exception as e:
             _logger.error(f"Error submitting form: {str(e)}")
-            return {
-                "Status": 0,
-                "Message": f"Error: {str(e)}"
-            }
+            return {"Status": 0, "Message": f"Error: {str(e)}"}
+
+
 
     @http.route('/visitor/sendNotification', auth='public', type='http', methods=['POST'], csrf=False)
     def send_notification(self, **kw):
@@ -622,90 +641,71 @@ class EmployeeAPI(http.Controller):
 
  
 class VisitorFieldAPI(http.Controller):
-
+    
     @http.route('/visitor/fields', type='http', auth='public', methods=['GET'], csrf=False)
     def get_visitor_fields(self, **kwargs):
         try:
-            # Get company_id and location_id from kwargs
             company_id = kwargs.get("company_id", request.env.company.id)
             location_id = kwargs.get("location_id")
 
-            # Validate company
             company = request.env['res.company'].sudo().browse(int(company_id))
             if not company.exists():
-                return request.make_json_response({
-                    "Status": 0,
-                    "Message": "Invalid company ID",
-                    "Data": []
-                })
+                return request.make_json_response({"Status": 0, "Message": "Invalid company ID", "Data": []})
 
-            # If location_id is provided, validate it
             location = None
             if location_id:
-                location = request.env['company.location'].sudo().browse(int(location_id))  
-                # replace `company.location` with your actual model name for locations
+                location = request.env['company.location'].sudo().browse(int(location_id))
                 if not location.exists() or location.company_id.id != company.id:
-                    return request.make_json_response({
-                        "Status": 0,
-                        "Message": "Invalid location ID for this company",
-                        "Data": []
-                    })
+                    return request.make_json_response({"Status": 0, "Message": "Invalid location ID for this company", "Data": []})
 
-            # Fetch company fields
             domain = [('enabled', '=', True)]
             if location:
                 domain.append(('location_id', '=', location.id))
             else:
-                domain.append(('company_id', '=', company.id))
+                domain.append(('location_id.company_id', '=', company.id)) # now valid
 
-            fields = request.env['company.field'].sudo().search(domain)
+            fields_cfg = request.env['company.field'].sudo().search(domain)
 
-            fields_data = [{
-                "id": field.id,
-                "field_id": field.field_id.id,
-                "field_name": field.field_id.name,
-                "label": field.label,
-                "type": field.field_type,
-                "required": field.required,
-            } for field in fields]
+            data = [{
+                "id": cfg.id,
+                "field_id": cfg.field_id.id,
+                "field_name": cfg.field_id.name,
+                "label": cfg.label,
+                "type": cfg.field_type,
+                "required": cfg.required,
+            } for cfg in fields_cfg]
 
-
-            # Response
-            if fields_data:
-                return request.make_json_response({
-                    "Status": 1,
-                    "Message": "Fields fetched successfully",
-                    "Data": fields_data
-                })
+            if data:
+                return request.make_json_response({"Status": 1, "Message": "Fields fetched successfully", "Data": data})
             else:
-                return request.make_json_response({
-                    "Status": 0,
-                    "Message": "No visitor fields configured",
-                    "Data": []
-                })
+                return request.make_json_response({"Status": 0, "Message": "No visitor fields configured", "Data": []})
 
         except Exception as e:
             _logger.exception("Error in fetching visitor fields: %s", str(e))
-            return request.make_json_response({
-                "Status": 0,
-                "Message": f"Error: {str(e)}",
-                "Data": []
-            }, status=500)
+            return request.make_json_response({"Status": 0, "Message": f"Error: {str(e)}", "Data": []}, status=500)
 
 
 
 class CompanyAPI(http.Controller):
 
+    def _logo_b64(self, company, size_field):
+        # Try requested size field first (image_128/256/512/1024/1920), else fallback to logo/image_1920
+        bin_val = getattr(company, size_field, None) or company.logo or getattr(company, 'image_1920', None)
+        if not bin_val:
+            return ""
+        # Odoo binary fields are base64; can be bytes or str depending on context
+        return bin_val.decode('utf-8') if isinstance(bin_val, (bytes, bytearray)) else bin_val
+
     @http.route('/visitor/company', type='http', auth='public', methods=['GET'], csrf=False)
     def get_company(self, **kwargs):
         try:
-            # Limit the number of companies fetched
+            # optional: pick image size; default to 128 to keep responses small
+            size = kwargs.get('size', '128')
+            size_field = f"image_{size}" if size in {'128','256','512','1024','1920'} else 'image_128'
+
             companies = request.env['res.company'].sudo().search([], limit=100)
 
-            # Fetch needed fields
             data = []
-            base_url = request.httprequest.host_url.rstrip('/')
-
             for company in companies:
                 company_data = {
                     "id": company.id,
@@ -713,7 +713,10 @@ class CompanyAPI(http.Controller):
                     "email": company.email,
                     "phone": company.phone,
                     "website": company.website,
-                    "logo_url": f"{base_url}/web/image/res.company/{company.id}/logo" if company.logo else ""
+                    # base64 instead of URL
+                    "logo_base64": self._logo_b64(company, size_field),
+                    # if you prefer a data URI form for direct <img src>, uncomment next line:
+                    # "logo_data_uri": f"data:image/png;base64,{self._logo_b64(company, size_field)}" if self._logo_b64(company, size_field) else ""
                 }
                 data.append(company_data)
 

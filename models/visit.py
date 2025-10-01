@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import json
 import uuid
 from lxml import etree
 from odoo import models, fields, api,_
@@ -12,7 +12,11 @@ import requests
 from odoo.addons.visitor_management.controllers.api import SMSUtils
 
 _logger = logging.getLogger(__name__)
-
+try:
+    # available in modern Odoo versions
+    from odoo.osv.orm import setup_modifiers
+except Exception:
+    setup_modifiers = None
 
 class VisitInformation(models.Model):
     _name = 'visit.information'
@@ -50,35 +54,133 @@ class VisitInformation(models.Model):
     )
     
     @api.model
-    def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
-        _logger.info("fields_view_get called for visit.information")
-        result = super().fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar, submenu=submenu)
- 
-        if view_type == 'form':
-            doc = etree.XML(result['arch'])
- 
-            # Find your target <group> in the inherited view
-            group = doc.xpath("//group[@name='custom_fields']")
-            if group:
-                group = group[0]
-                existing_fields = {node.get("name") for node in group.xpath(".//field")}
- 
-                # Get all fields of this model
-                all_fields = self._fields.keys()
- 
-                # Filter out technical ones
-                auto_fields = [f for f in all_fields if f not in existing_fields and not f.startswith("_")]
- 
-                # Dynamically add missing fields
-                for field in auto_fields:
-                    # Only add custom fields or new fields you want
-                    if self._fields[field].manual:  # `manual=True` means created via UI
-                        new_field = etree.Element("field", name=field)
-                        group.append(new_field)
- 
-                result['arch'] = etree.tostring(doc, encoding='unicode')
- 
-        return result
+    def _get_view(self, view_id=None, view_type='form', **options):
+        arch, view = super()._get_view(view_id, view_type, **options)
+        if view_type != "form":
+            return arch, view
+
+        # arch may be string or lxml element (v18); keep/return same type
+        is_element = isinstance(arch, etree._Element)
+        doc = arch if is_element else etree.fromstring(arch)
+
+        holder_nodes = doc.xpath("//group[@name='custom_fields']")
+        if not holder_nodes:
+            return (doc if is_element else etree.tostring(doc, encoding="unicode")), view
+        holder = holder_nodes[0]
+
+        # Company context (view is cached, so rely on default_company_id or current company)
+        company_id = self.env.context.get('default_company_id') or self.env.company.id
+
+        # Fetch *all* location-specific configs for this company
+        cfgs = self.env['company.field'].sudo().search([
+            ('enabled', '=', True),
+            ('location_id.company_id', '=', company_id),
+        ])
+
+        # Avoid duplicate {field, location} injections if view already has some
+        seen = {(n.get('name'), n.get('data-location')) for n in holder.xpath(".//field[@name]")}
+
+        # Also track all fields already present in the *entire* form view
+        existing_in_form = {n.get("name") for n in doc.xpath("//field[@name]")}
+
+        # If 'view' is a dict (in some code paths), update field metadata so webclient can render
+        fields_dict = view['fields'] if isinstance(view, dict) and 'fields' in view else None
+
+        for cfg in cfgs:
+            fname = cfg.field_id and cfg.field_id.name
+            if not fname or fname not in self._fields:
+                continue
+
+            # Skip if this field already exists in form (avoid duplicates like "name")
+            if fname in existing_in_form:
+                _logger.info("Skipping field %s because it's already in the form", fname)
+                continue
+
+            loc_id = int(cfg.location_id.id)
+            key = (fname, str(loc_id))
+            if key in seen:
+                continue
+
+            # Ensure JS metadata (if accessible in this code path)
+            if fields_dict is not None and fname not in fields_dict:
+                fields_dict.update(self.fields_get([fname]))
+
+            node = etree.Element("field", name=fname)
+            node.set('data-location', str(loc_id))  # for debugging in DOM inspectors
+
+            # Label override (per-location)
+            if cfg.label:
+                node.set('string', cfg.label)
+
+            # Inline modifiers: visible only when this location is selected
+            node.set('invisible', f"location_id != {loc_id}")
+
+            # Only enforce required at view level if the model field itself isn’t required
+            if cfg.required and not self._fields[fname].required:
+                node.set('required', f"location_id == {loc_id}")
+
+            # Compute modifiers so the web client honors attributes
+            if setup_modifiers:
+                setup_modifiers(node, self._fields[fname], context=self.env.context, in_tree_view=False)
+            else:
+                node.set('modifiers', json.dumps({}))  # safe fallback
+
+            holder.append(node)
+            seen.add(key)
+            _logger.info("Injected dynamic field %s for location %s (required=%s)", fname, loc_id, cfg.required)
+            print("&&&&&............>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>TESTING",fname)
+
+        return (doc if is_element else etree.tostring(doc, encoding="unicode")), view
+
+    
+    # @api.model
+    # def _get_view(self, view_id=None, view_type='form', **options):
+    #     arch, view = super()._get_view(view_id, view_type, **options)
+
+    #     if view_type != "form":
+    #         return arch, view
+
+    #     # Handle arch as string or element
+    #     is_element = isinstance(arch, etree._Element)
+    #     doc = arch if is_element else etree.fromstring(arch)
+
+    #     # Find target group where to inject fields
+    #     holder_nodes = doc.xpath("//group[@name='custom_fields']")
+    #     if not holder_nodes:
+    #         return (doc if is_element else etree.tostring(doc, encoding="unicode")), view
+    #     holder = holder_nodes[0]
+
+    #     # Fetch manual fields of this model
+    #     manual_fields = self.env["ir.model.fields"].sudo().search([
+    #         ("model", "=", self._name),
+    #         ("state", "=", "manual"),
+    #     ])
+
+    #     _logger.info("Found manual fields for %s: %s", self._name, manual_fields.mapped("name"))
+
+    #     # Track existing to avoid duplicates
+    #     existing = {n.get("name") for n in holder.xpath(".//field[@name]")}
+
+    #     # Inject manual fields into view
+    #     for field in manual_fields:
+    #         if field.name in existing:
+    #             continue
+    #         _logger.info("Injecting field: %s (%s)", field.name, field.field_description)
+
+    #         # Ensure view dict knows about this field
+    #         if isinstance(view, dict) and "fields" in view and field.name not in view["fields"]:
+    #             view["fields"].update(self.fields_get([field.name]))
+
+    #         node = etree.Element("field", name=field.name)
+    #         node.set("string", field.field_description or field.name)
+    #         node.set("invisible", "location_id == False")         
+    #         node.set("modifiers", json.dumps({}))  # required in v16+
+
+    #         holder.append(node)
+
+    #     # Return same type as we got
+    #     return (doc if is_element else etree.tostring(doc, encoding="unicode")), view
+
 
     
 
@@ -108,10 +210,11 @@ class VisitInformation(models.Model):
             rec.company_id = rec.employee.company_id if rec.employee else False
             
     def get_dynamic_fields(self):
-        """Return company-configured fields"""
-        company = self.env.company
-        configs = company.visitor_field_ids.filtered(lambda c: c.enabled)
-        return configs.mapped("field_name")
+        return self.env['company.field'].sudo().search([
+            ('enabled', '=', True),
+            ('location_id.company_id', '=', self.env.company.id),
+        ]).mapped(lambda c: c.field_id.name)
+
     
     @api.model
     def _default_employee(self):
@@ -243,12 +346,18 @@ class CompanyField(models.Model):
     _name = "company.field"
     _description = "Visitor Field Configuration"
 
-    location_id = fields.Many2one(
-        "company.location", required=True, ondelete="cascade"
-    )
+    
+    location_id = fields.Many2one("company.location", required=True, ondelete="cascade")
     field_id = fields.Many2one(
         "ir.model.fields",
-        domain="[('model_id.model', '=', 'visit.information'),('state','in',['manual','base'])]"
+        domain="[('model_id.model', '=', 'visit.information'), ('state','in',['manual','base'])]"
+    )
+    company_id = fields.Many2one(
+        'res.company',
+        related='location_id.company_id',
+        store=True,
+        index=True,
+        readonly=True,
     )
     label = fields.Char("Label")
     enabled = fields.Boolean("Enabled", default=True)
@@ -257,8 +366,32 @@ class CompanyField(models.Model):
         ("text","TEXT"),
         ("dropdown","Dropdown")
     ])
+    
+    _sql_constraints = [
+        ('uniq_location_field', 'unique(location_id, field_id)', 'This field is already configured for this location.')
+    ]
+    visitor_model_id = fields.Many2one(
+        'ir.model',
+        compute='_compute_visitor_model_id',
+        store=True,
+        readonly=True
+    )
 
+    @api.depends()
+    def _compute_visitor_model_id(self):
+        visit_model = self.env["ir.model"].sudo().search([("model", "=", "visit.information")], limit=1)
+        for rec in self:
+            rec.visitor_model_id = visit_model.id
 
+    @api.model
+    def default_get(self, fields):
+        res = super().default_get(fields)
+        visit_model = self.env["ir.model"].sudo().search([("model", "=", "visit.information")], limit=1)
+        if visit_model:
+            res["visitor_model_id"] = visit_model.id
+        return res
+        
+        
 # Inherited seprately because many2many error
 class CustomField(models.Model):
     _inherit = 'res.company'
@@ -302,9 +435,7 @@ class CompanyLocation(models.Model):
     visitor_field_ids = fields.One2many(
         "company.field", "location_id", string="Visitor Fields"
     )
-
-
-
+    
 class CompanyLocationQuestion(models.Model):
     _name = "company.location.question"
     _description = "Location Additional Questions"
