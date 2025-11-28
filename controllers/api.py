@@ -222,6 +222,97 @@ class Otp(http.Controller):
                 "Data": {}
             }
 
+    @http.route('/visitor/check_status', type='json', auth='public', methods=['POST'], csrf=False)
+    def check_status(self, **kw):
+        """
+        This API checks whether a visitor is:
+         - already checked in
+         - already checked out
+         - not approved
+         - or ready for check-in
+
+        It does NOT modify the database (read-only).
+        """
+        try:
+            payload = request.httprequest.get_json(force=True, silent=True) or {}
+            visitor_id = payload.get("visitor_id")
+
+            _logger.info(f"Incoming Check Status Payload: {payload}")
+
+            # Validate input
+            if not visitor_id:
+                return {
+                    "Status": 0,
+                    "Message": "Visitor ID is required.",
+                    "Data": {}
+                }
+
+            visitor = request.env['visit.information'].sudo().browse(int(visitor_id))
+
+            # Check existence
+            if not visitor.exists():
+                return {
+                    "Status": 0,
+                    "Message": "Visitor not found.",
+                    "Data": {}
+                }
+
+            # Check approval
+            if visitor.status != "approved":
+                return {
+                    "Status": 0,
+                    "Message": f"Visitor not approved yet (status={visitor.status}).",
+                    "Data": {
+                        "Approved": False,
+                        "CheckedIn": False,
+                        "CheckedOut": False
+                    }
+                }
+
+            # Check current attendance state
+            if visitor.check_in and not visitor.check_out:
+                return {
+                    "Status": 0,
+                    "Message": "Already checked in.",
+                    "Data": {
+                        "Approved": True,
+                        "CheckedIn": True,
+                        "CheckedOut": False,
+                        "CheckInTime": visitor.check_in.strftime("%Y-%m-%d %H:%M:%S") if visitor.check_in else None
+                    }
+                }
+
+            if visitor.check_in and visitor.check_out:
+                return {
+                    "Status": 0,
+                    "Message": "Already checked out.",
+                    "Data": {
+                        "Approved": True,
+                        "CheckedIn": True,
+                        "CheckedOut": True,
+                        "CheckInTime": visitor.check_in.strftime("%Y-%m-%d %H:%M:%S") if visitor.check_in else None,
+                        "CheckOutTime": visitor.check_out.strftime("%Y-%m-%d %H:%M:%S") if visitor.check_out else None
+                    }
+                }
+
+            # Default: Not checked in, approved, ready to proceed
+            return {
+                "Status": 1,
+                "Message": "Visitor ready for check-in.",
+                "Data": {
+                    "Approved": True,
+                    "CheckedIn": False,
+                    "CheckedOut": False
+                }
+            }
+
+        except Exception as e:
+            _logger.exception("Error in Check Status API")
+            return {
+                "Status": -1,
+                "Message": f"Internal Server Error: {str(e)}",
+                "Data": {}
+            }
 
 
     @http.route('/visitor/checkin_out', type='json', auth='public', methods=['POST'], csrf=False)

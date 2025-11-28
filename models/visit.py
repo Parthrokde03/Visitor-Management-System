@@ -48,7 +48,7 @@ class VisitInformation(models.Model):
     ("walkin", "Walk-In")
     ], default="pre", string="Visitor Type")
     nda_answer = fields.Image(string="Signature",max_width=1024,max_height=768,verify_resolution=True)
-    photo_answer = fields.Image(string="Photo",max_width=1024,max_height=768,verify_resolution=True)
+    photo_answer = fields.Image(string="Photo",max_width=1024,max_height=1024,verify_resolution=True)
     notebook_id = fields.One2many(
         'visitor.notebook.entry', 'visitor_id', string="Notebook Entries",ondelete='cascade'
     )
@@ -131,58 +131,6 @@ class VisitInformation(models.Model):
             print("&&&&&............>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>TESTING",fname)
 
         return (doc if is_element else etree.tostring(doc, encoding="unicode")), view
-
-    
-    # @api.model
-    # def _get_view(self, view_id=None, view_type='form', **options):
-    #     arch, view = super()._get_view(view_id, view_type, **options)
-
-    #     if view_type != "form":
-    #         return arch, view
-
-    #     # Handle arch as string or element
-    #     is_element = isinstance(arch, etree._Element)
-    #     doc = arch if is_element else etree.fromstring(arch)
-
-    #     # Find target group where to inject fields
-    #     holder_nodes = doc.xpath("//group[@name='custom_fields']")
-    #     if not holder_nodes:
-    #         return (doc if is_element else etree.tostring(doc, encoding="unicode")), view
-    #     holder = holder_nodes[0]
-
-    #     # Fetch manual fields of this model
-    #     manual_fields = self.env["ir.model.fields"].sudo().search([
-    #         ("model", "=", self._name),
-    #         ("state", "=", "manual"),
-    #     ])
-
-    #     _logger.info("Found manual fields for %s: %s", self._name, manual_fields.mapped("name"))
-
-    #     # Track existing to avoid duplicates
-    #     existing = {n.get("name") for n in holder.xpath(".//field[@name]")}
-
-    #     # Inject manual fields into view
-    #     for field in manual_fields:
-    #         if field.name in existing:
-    #             continue
-    #         _logger.info("Injecting field: %s (%s)", field.name, field.field_description)
-
-    #         # Ensure view dict knows about this field
-    #         if isinstance(view, dict) and "fields" in view and field.name not in view["fields"]:
-    #             view["fields"].update(self.fields_get([field.name]))
-
-    #         node = etree.Element("field", name=field.name)
-    #         node.set("string", field.field_description or field.name)
-    #         node.set("invisible", "location_id == False")         
-    #         node.set("modifiers", json.dumps({}))  # required in v16+
-
-    #         holder.append(node)
-
-    #     # Return same type as we got
-    #     return (doc if is_element else etree.tostring(doc, encoding="unicode")), view
-
-
-    
 
     @api.model_create_multi
     def create(self, vals_list):
