@@ -62,6 +62,7 @@
                                 readonly="True" />
                             <field name="employee" groups="visitor_management.group_admin" />
                             <field name="company_id" />
+                            <field name="visit_type_id" />
                             <field name="purpose" />
                             <field name="instructions" />
                         </group>

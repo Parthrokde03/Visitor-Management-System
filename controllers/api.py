@@ -612,6 +612,11 @@ class VisitorForm(http.Controller):
                     "Enabled": location.question,
                     "Required": location.question_required,
                 },
+                "Video": {
+                    "Enabled": location.video,
+                    "Required": location.video_required,
+                    "VideoURL": location.tutorial_video_url or "",
+                },
             }
 
         except Exception as e:
@@ -885,6 +890,11 @@ class CompanyAPI(http.Controller):
                 "Enabled": loc.question,
                 "Required": loc.question_required,
             },
+            "Video": {
+                "Enabled": loc.video,
+                "Required": loc.video_required,
+                "VideoURL": loc.tutorial_video_url or "",
+            },
         } for loc in locations]
 
         return request.make_response(
@@ -960,7 +970,8 @@ class VisitorQuestionController(http.Controller):
             "id": q.id,
             "question": q.question_text,
             "type": q.question_type,
-            "required": q.required
+            "required": q.required,
+            "options": [{"id": opt.id, "name": opt.name} for opt in q.option_ids]
         } for q in location.additional_question_ids]
 
         return request.make_json_response({
@@ -1005,8 +1016,9 @@ class VisitorQuestionController(http.Controller):
             for ans in answers:
                 question_id = ans.get("question_id")
                 answer_selection = ans.get("answer_selection")
+                answer_option_id = ans.get("answer_option_id")
 
-                if not question_id or answer_selection not in ('yes', 'no'):
+                if not question_id:
                     continue
 
                 notebook_entry = request.env['visitor.notebook.entry'].sudo().search([
@@ -1014,14 +1026,20 @@ class VisitorQuestionController(http.Controller):
                     ('question_id', '=', question_id)
                 ], limit=1)
 
+                vals = {}
+                if answer_option_id:
+                    vals['answer_option_id'] = int(answer_option_id)
+                if answer_selection is not None:
+                    vals['answer_selection'] = answer_selection
+
                 if notebook_entry:
-                    notebook_entry.sudo().write({'answer_selection': answer_selection})
+                    notebook_entry.sudo().write(vals)
                 else:
-                    request.env['visitor.notebook.entry'].sudo().create({
+                    vals.update({
                         'visitor_id': visitor.id,
                         'question_id': question_id,
-                        'answer_selection': answer_selection
                     })
+                    request.env['visitor.notebook.entry'].sudo().create(vals)
 
             return request.make_response(
                 json.dumps({"success": True, "message": "Answers submitted successfully"}),

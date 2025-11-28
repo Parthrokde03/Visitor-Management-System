@@ -41,6 +41,7 @@ class VisitInformation(models.Model):
     location_id = fields.Many2one("company.location",string="Location",domain="[('company_id', '=', company_id)]")
     attachment_id = fields.Many2one("ir.attachment")
     visiting_date = fields.Datetime(string="Date")
+    visit_type_id = fields.Many2one("visit.type", string="Visit Type")
     qr_token = fields.Char("QR Token", default=lambda self: str(uuid.uuid4()), readonly=True)
     instructions = fields.Text(string="Instruction")
     visit_type = fields.Selection([
@@ -288,6 +289,20 @@ class VisitInformation(models.Model):
                 ("visiting_date", "<=", end_of_day),
             ])
         return counts
+
+
+class VisitType(models.Model):
+    _name = 'visit.type'
+    _description = 'Visit Type'
+    _order = 'name'
+
+    name = fields.Char(required=True)
+    active = fields.Boolean(default=True)
+
+    _sql_constraints = [
+        ('visit_type_name_unique', 'unique(name)', 'Visit type name must be unique.')
+    ]
+
         
 # Dynamic fields   
 class CompanyField(models.Model):
@@ -353,10 +368,12 @@ class VisitorNotebookEntry(models.Model):
 
     visitor_id = fields.Many2one('visit.information', string="Visitor", required=True, ondelete='cascade')
     question_id = fields.Many2one('company.location.question', string="Question", required=True)
-    answer_selection = fields.Selection([
-        ('yes', 'Yes'),
-        ('no', 'No'),
-    ], string="Answer Option")
+    answer_option_id = fields.Many2one(
+        'company.location.question.option',
+        string="Answer Option",
+        domain="[('question_id', '=', question_id)]"
+    )
+    answer_selection = fields.Char(string="Answer Text")
 
 
 class CompanyLocation(models.Model):
@@ -370,11 +387,15 @@ class CompanyLocation(models.Model):
     nda = fields.Boolean("NDA")
     photo = fields.Boolean("Photo")
     question = fields.Boolean("Question")
+    video = fields.Boolean("Video")
 
     # Required checkboxes
     nda_required = fields.Boolean("Required")
     photo_required = fields.Boolean("Required")
     question_required = fields.Boolean("Required")
+    video_required = fields.Boolean("Required")
+
+    tutorial_video_url = fields.Char("Tutorial Video URL")
 
     nda_details = fields.Html()
     additional_question_ids = fields.One2many(
@@ -394,3 +415,18 @@ class CompanyLocationQuestion(models.Model):
     question_text = fields.Char("Question", required=True)
     question_type = fields.Selection([("checkbox", "Checkbox")], default="checkbox")
     required = fields.Boolean("Required", default=False)
+    option_ids = fields.One2many(
+        "company.location.question.option",
+        "question_id",
+        string="Options"
+    )
+
+
+class CompanyLocationQuestionOption(models.Model):
+    _name = "company.location.question.option"
+    _description = "Options for Location Questions"
+    _order = "sequence, id"
+
+    question_id = fields.Many2one("company.location.question", required=True, ondelete="cascade")
+    name = fields.Char("Option", required=True)
+    sequence = fields.Integer(default=10)

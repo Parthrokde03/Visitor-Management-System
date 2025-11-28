@@ -16,6 +16,7 @@
                                 <field name="photo" />
                                 <!-- <field name="photo_required" string="Required" /> -->
                                 <field name="question" />
+                                <field name="video" />
                                 <!-- <field name="question_required" string="Required" /> -->
                             </list>
 
@@ -33,6 +34,7 @@
                                             <field name="nda" />
                                             <field name="photo" />
                                             <field name="question" />
+                                            <field name="video" />
                                         </group>
 
                                         <!-- right column -->
@@ -43,7 +45,13 @@
                                                 attrs="{'readonly':[('photo','=',False)]}" />
                                             <field name="question_required" string="Required"
                                                 attrs="{'readonly':[('question','=',False)]}" />
+                                            <field name="video_required" string="Required"
+                                                attrs="{'readonly':[('video','=',False)]}" />
                                         </group>
+                                    </group>
+
+                                    <group string="Tutorial Video" attrs="{'invisible': [('video','=',False)]}">
+                                        <field name="tutorial_video_url" placeholder="https://example.com/tutorial.mp4" />
                                     </group>
 
                                     <group string="Additional Questions">
@@ -53,6 +61,21 @@
                                                 <field name="question_type" />
                                                 <field name="required" />
                                             </list>
+                                            <form>
+                                                <group>
+                                                    <field name="question_text" />
+                                                    <field name="question_type" />
+                                                    <field name="required" />
+                                                </group>
+                                                <group string="Options">
+                                                    <field name="option_ids">
+                                                        <list editable="bottom">
+                                                            <field name="name" />
+                                                            <field name="sequence" />
+                                                        </list>
+                                                    </field>
+                                                </group>
+                                            </form>
                                         </field>
                                     </group>
 
