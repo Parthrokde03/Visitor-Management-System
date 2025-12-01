@@ -781,6 +781,25 @@ class VisitorFieldAPI(http.Controller):
             return request.make_json_response({"Status": 0, "Message": f"Error: {str(e)}", "Data": []}, status=500)
 
 
+    @http.route('/visitor/visit_types', type='http', auth='public', methods=['GET'], csrf=False)
+    def get_visit_types(self, **kwargs):
+        """Return active visit types for populating frontend dropdowns."""
+        try:
+            types = request.env['visit.type'].sudo().search([('active', '=', True)])
+            data = [{"id": vt.id, "name": vt.name} for vt in types]
+            return request.make_json_response({
+                "Status": 1 if data else 0,
+                "Message": "Visit types fetched" if data else "No visit types found",
+                "Data": data
+            })
+        except Exception as e:
+            _logger.exception("Error in fetching visit types: %s", str(e))
+            return request.make_json_response({
+                "Status": 0,
+                "Message": f"Error: {str(e)}",
+                "Data": []
+            }, status=500)
+        
 
 class CompanyAPI(http.Controller):
 

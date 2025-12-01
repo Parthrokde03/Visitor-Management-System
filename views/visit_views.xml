@@ -78,9 +78,8 @@
                             <field name="notebook_id">
                                 <list editable="bottom">
                                     <field name="question_id" />
-                                    <!-- <field name="answer_text"/>
-                                <field name="answer_bool"/> -->
-                                    <field name="answer_selection" />
+                                    <field name="answer_option_id" string="Option" />
+                                    <field name="answer_selection" string="Selection" />
                                 </list>
                             </field>
                         </page>

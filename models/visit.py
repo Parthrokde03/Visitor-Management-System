@@ -367,13 +367,18 @@ class VisitorNotebookEntry(models.Model):
     _description = 'Visitor Notebook Entry'
 
     visitor_id = fields.Many2one('visit.information', string="Visitor", required=True, ondelete='cascade')
-    question_id = fields.Many2one('company.location.question', string="Question", required=True)
+    question_id = fields.Many2one('company.location.question', string="Question", required=True, ondelete='cascade')
     answer_option_id = fields.Many2one(
         'company.location.question.option',
         string="Answer Option",
-        domain="[('question_id', '=', question_id)]"
+        domain="[('question_id', '=', question_id)]",
+        ondelete='set null'
     )
-    answer_selection = fields.Char(string="Answer Text")
+    # Keep legacy yes/no selection for backward compatibility and fallbacks
+    answer_selection = fields.Selection([
+        ('yes', 'Yes'),
+        ('no', 'No'),
+    ], string="Answer Selection")
 
 
 class CompanyLocation(models.Model):
