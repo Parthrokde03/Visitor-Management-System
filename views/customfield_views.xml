@@ -51,7 +51,21 @@
                                     </group>
 
                                     <group string="Tutorial Video" attrs="{'invisible': [('video','=',False)]}">
-                                        <field name="tutorial_video_url" placeholder="https://example.com/tutorial.mp4" />
+                                        <field name="tutorial_video_ids"
+                                            context="{'default_location_id': id}">
+                                            <list editable="bottom" create="false" string="Tutorial Videos by Visit Type">
+                                                <field name="visit_type_id" readonly="1"/>
+                                                <field name="video_url" string="Tutorial Video URL"/>
+                                            </list>
+                                            <form string="Tutorial Videos by Visit Type">
+                                                <group>
+                                                    <field name="location_id" readonly="1"/>
+                                                    <field name="visit_type_id" readonly="1"/>
+                                                    <field name="video_url" string="Tutorial Video URL"/>
+                                                </group>
+                                            </form>
+                                        </field>
+                                        <!-- <field name="tutorial_video_url" string="Default Tutorial Video URL (fallback)" placeholder="https://example.com/tutorial.mp4" /> -->
                                     </group>
 
                                     <group string="Additional Questions">

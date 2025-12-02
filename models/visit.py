@@ -303,6 +303,15 @@ class VisitType(models.Model):
         ('visit_type_name_unique', 'unique(name)', 'Visit type name must be unique.')
     ]
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Ensure tutorial video rows exist for all locations when a visit type is created."""
+        records = super().create(vals_list)
+        locations = self.env["company.location"].sudo().search([])
+        tutorial_video_obj = self.env["company.location.tutorial.video"].sudo()
+        tutorial_video_obj._create_missing_for_locations(locations, records)
+        return records
+
         
 # Dynamic fields   
 class CompanyField(models.Model):
@@ -406,10 +415,104 @@ class CompanyLocation(models.Model):
     additional_question_ids = fields.One2many(
         "company.location.question", "location_id", string="Additional Questions"
     )
+    tutorial_video_ids = fields.One2many(
+        "company.location.tutorial.video",
+        "location_id",
+        string="Tutorial Videos by Visit Type",
+    )
     visitor_field_ids = fields.One2many(
         "company.field", "location_id", string="Visitor Fields"
     )
-    
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Create missing tutorial video rows for every visit type on new locations."""
+        records = super().create(vals_list)
+        visit_types = self.env["visit.type"].sudo().search([])
+        tutorial_video_obj = self.env["company.location.tutorial.video"].sudo()
+        tutorial_video_obj._create_missing_for_locations(records, visit_types)
+        return records
+
+    def get_tutorial_video_url(self, visit_type_id=False):
+        """Return the tutorial video URL for a given visit type or fallback."""
+        self.ensure_one()
+        visit_type_id = visit_type_id.id if hasattr(visit_type_id, "id") else visit_type_id
+
+        if visit_type_id:
+            video_line = self.tutorial_video_ids.filtered(
+                lambda tv: tv.visit_type_id.id == visit_type_id
+            )
+            if video_line:
+                return video_line[0].video_url or ""
+
+        return self.tutorial_video_url or ""
+
+    def _get_video_urls_payload(self):
+        """Helper to expose tutorial URLs keyed by visit type."""
+        self.ensure_one()
+        return [
+            {
+                "visit_type_id": line.visit_type_id.id,
+                "visit_type_name": line.visit_type_id.name,
+                "video_url": line.video_url or "",
+            }
+            for line in self.tutorial_video_ids
+            if line.visit_type_id
+        ]
+
+
+class CompanyLocationTutorialVideo(models.Model):
+    _name = "company.location.tutorial.video"
+    _description = "Tutorial Video by Visit Type"
+    _order = "visit_type_id"
+
+    location_id = fields.Many2one("company.location", required=True, ondelete="cascade")
+    visit_type_id = fields.Many2one("visit.type", required=True, ondelete="cascade")
+    video_url = fields.Char("Tutorial Video URL")
+
+    _sql_constraints = [
+        (
+            "location_visit_type_unique",
+            "unique(location_id, visit_type_id)",
+            "Only one tutorial video can be set per visit type and location.",
+        )
+    ]
+
+    @api.model
+    def _create_missing_for_locations(self, locations, visit_types):
+        """Create blank tutorial video rows for the given locations/types if missing."""
+        locations = locations.sudo()
+        visit_types = visit_types.sudo()
+        if not locations or not visit_types:
+            return
+
+        existing_pairs = {
+            (line.location_id.id, line.visit_type_id.id)
+            for line in self.sudo().search([
+                ("location_id", "in", locations.ids),
+                ("visit_type_id", "in", visit_types.ids),
+            ])
+        }
+
+        create_vals = []
+        for location in locations:
+            for visit_type in visit_types:
+                if (location.id, visit_type.id) in existing_pairs:
+                    continue
+                create_vals.append({
+                    "location_id": location.id,
+                    "visit_type_id": visit_type.id,
+                })
+        if create_vals:
+            self.sudo().create(create_vals)
+
+    @api.model
+    def init(self):
+        """Backfill tutorial video lines for existing locations/types."""
+        locations = self.env["company.location"].sudo().search([])
+        visit_types = self.env["visit.type"].sudo().search([])
+        self._create_missing_for_locations(locations, visit_types)
+
 class CompanyLocationQuestion(models.Model):
     _name = "company.location.question"
     _description = "Location Additional Questions"

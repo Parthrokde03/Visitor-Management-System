@@ -84,6 +84,7 @@ class VisitorQRController(http.Controller):
                 "Status": 1,
                 "Message": "QR verified successfully.",
                 "VisitorID": visitor.id,
+                "VisitTypeID": visitor.visit_type_id.id if visitor.visit_type_id else None,
             }
 
         except Exception as e:
@@ -197,7 +198,13 @@ class Otp(http.Controller):
 
            
             if not visitor or not visitor.name:
-                return {"Status": 1, "Message": "New user - please register", "Data": {}, "Newuser": 1}
+                return {
+                    "Status": 1,
+                    "Message": "New user - please register",
+                    "Data": {},
+                    "Newuser": 1,
+                    "VisitTypeID": visitor.visit_type_id.id if visitor and visitor.visit_type_id else None
+                }
 
             
             if visitor.status != "approved":
@@ -211,7 +218,8 @@ class Otp(http.Controller):
             return {
                 "Status": 1,
                 "Message": "OTP verified successfully.",
-                "VisitorID": visitor.id
+                "VisitorID": visitor.id,
+                "VisitTypeID": visitor.visit_type_id.id if visitor.visit_type_id else None
             }
 
         except Exception as e:
@@ -520,7 +528,12 @@ class VisitorForm(http.Controller):
                 vals.setdefault('visiting_date', now)
                 visitor = request.env['visit.information'].sudo().create(vals)
 
-            return {"Status": 1, "Message": "Form submitted successfully!", "VisitorID": visitor.id}
+            return {
+                "Status": 1,
+                "Message": "Form submitted successfully!",
+                "VisitorID": visitor.id,
+                "VisitTypeID": visitor.visit_type_id.id if visitor.visit_type_id else None
+            }
         except Exception as e:
             _logger.error(f"Error submitting form: {str(e)}")
             return {"Status": 0, "Message": f"Error: {str(e)}"}
@@ -583,6 +596,10 @@ class VisitorForm(http.Controller):
             
     @http.route('/visitor/requirements', type='json', auth='public', methods=['POST'], csrf=False)
     def visitor_requirements(self, **kw):
+        """
+        Requirements endpoint now only returns which steps are enabled/required.
+        Tutorial video URLs are fetched separately via /visitor/video.
+        """
         try:
             payload = request.httprequest.get_json(force=True, silent=True) or {}
             visitor_id = payload.get("visitor_id")
@@ -595,6 +612,12 @@ class VisitorForm(http.Controller):
                 return {"Status": 0, "Message": "Visitor not found.", "Data": {}}
 
             location = visitor.location_id
+            if not location:
+                return {
+                    "Status": 0,
+                    "Message": "Location not set for visitor.",
+                    "Data": {}
+                }
 
             return {
                 "Status": 1,
@@ -608,19 +631,65 @@ class VisitorForm(http.Controller):
                     "Enabled": location.photo,
                     "Required": location.photo_required,
                 },
-                "Questions": {
-                    "Enabled": location.question,
-                    "Required": location.question_required,
-                },
                 "Video": {
                     "Enabled": location.video,
                     "Required": location.video_required,
-                    "VideoURL": location.tutorial_video_url or "",
+                },
+                "Questions": {
+                    "Enabled": location.question,
+                    "Required": location.question_required,
                 },
             }
 
         except Exception as e:
             _logger.exception("Error in Visitor Requirements API")
+            return {"Status": -1, "Message": f"Internal Server Error: {str(e)}", "Data": {}}
+
+    @http.route('/visitor/video', type='json', auth='public', methods=['POST'], csrf=False)
+    def visitor_video(self, **kw):
+        """
+        Separate endpoint to fetch tutorial video URLs (default + per visit type).
+        Accepts visitor_id (preferred) to resolve location and visit type.
+        Optional visit_type_id can override the visitor's stored type.
+        """
+        try:
+            payload = request.httprequest.get_json(force=True, silent=True) or {}
+            visitor_id = payload.get("visitor_id")
+            visit_type_id = payload.get("visit_type_id")
+
+            if not visitor_id:
+                return {"Status": 0, "Message": "Visitor ID is required.", "Data": {}}
+
+            visitor = request.env['visit.information'].sudo().browse(int(visitor_id))
+            if not visitor.exists():
+                return {"Status": 0, "Message": "Visitor not found.", "Data": {}}
+
+            location = visitor.location_id
+            if not location:
+                return {
+                    "Status": 0,
+                    "Message": "Location not set for visitor.",
+                    "Data": {}
+                }
+
+            # Choose visit type: payload override, then visitor field
+            vtype = visit_type_id or visitor.visit_type_id
+            video_url = location.get_tutorial_video_url(vtype) if hasattr(location, "get_tutorial_video_url") else None
+            if not video_url:
+                video_url = location.tutorial_video_url or ""
+
+            video_urls_by_type = location._get_video_urls_payload() if hasattr(location, "_get_video_urls_payload") else []
+
+            return {
+                "Status": 1,
+                "Message": "Video URLs",
+                "VisitorID": visitor.id,
+                "VideoURL": video_url or "",
+                "VideoURLsByType": video_urls_by_type,
+            }
+
+        except Exception as e:
+            _logger.exception("Error in Visitor Video API")
             return {"Status": -1, "Message": f"Internal Server Error: {str(e)}", "Data": {}}
 
 
@@ -893,6 +962,9 @@ class CompanyAPI(http.Controller):
                 headers=[('Content-Type', 'application/json')]
             )
 
+        visit_type_id = kwargs.get("visit_type_id")
+        visit_type_id = int(visit_type_id) if visit_type_id and str(visit_type_id).isdigit() else False
+
         locations = request.env['company.location'].sudo().search([('company_id', '=', company_id)])
         data = [{
             "id": loc.id,
@@ -912,7 +984,8 @@ class CompanyAPI(http.Controller):
             "Video": {
                 "Enabled": loc.video,
                 "Required": loc.video_required,
-                "VideoURL": loc.tutorial_video_url or "",
+                "VideoURL": loc.get_tutorial_video_url(visit_type_id) if hasattr(loc, "get_tutorial_video_url") else (loc.tutorial_video_url or ""),
+                "VideoURLsByType": loc._get_video_urls_payload() if hasattr(loc, "_get_video_urls_payload") else [],
             },
         } for loc in locations]
 
