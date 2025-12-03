@@ -520,6 +520,7 @@ class CompanyLocationQuestion(models.Model):
 
 
     location_id = fields.Many2one("company.location", required=True, ondelete="cascade")
+    visit_type_id = fields.Many2one("visit.type", string="Visit Type", help="Optional visit type-specific question")
     question_text = fields.Char("Question", required=True)
     question_type = fields.Selection([("checkbox", "Checkbox")], default="checkbox")
     required = fields.Boolean("Required", default=False)

@@ -71,12 +71,14 @@
                                     <group string="Additional Questions">
                                         <field name="additional_question_ids" mode="list">
                                             <list editable="bottom">
+                                                <field name="visit_type_id" />
                                                 <field name="question_text" />
                                                 <field name="question_type" />
                                                 <field name="required" />
                                             </list>
                                             <form>
                                                 <group>
+                                                    <field name="visit_type_id" />
                                                     <field name="question_text" />
                                                     <field name="question_type" />
                                                     <field name="required" />

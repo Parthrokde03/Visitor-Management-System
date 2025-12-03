@@ -623,6 +623,7 @@ class VisitorForm(http.Controller):
                 "Status": 1,
                 "Message": "Requirements",
                 "VisitorID": visitor.id,
+                "LocationID": location.id,
                 "NDA": {
                     "Enabled": location.nda,
                     "Required": location.nda_required,
@@ -1057,14 +1058,23 @@ class VisitorQuestionController(http.Controller):
                 "Message": "Location not set for this visitor"
             })
 
-        # Build questions from location
+        visit_type_id = visitor.visit_type_id.id if visitor.visit_type_id else False
+
+        # Filter questions by visit type when set; otherwise take all
+        questions_recs = location.additional_question_ids
+        if visit_type_id:
+            questions_recs = questions_recs.filtered(
+                lambda q: not getattr(q, 'visit_type_id', False) or q.visit_type_id.id == visit_type_id
+            )
+
         questions = [{
             "id": q.id,
             "question": q.question_text,
             "type": q.question_type,
             "required": q.required,
+            "visit_type_id": q.visit_type_id.id if getattr(q, 'visit_type_id', False) else None,
             "options": [{"id": opt.id, "name": opt.name} for opt in q.option_ids]
-        } for q in location.additional_question_ids]
+        } for q in questions_recs]
 
         return request.make_json_response({
             "Status": 1,
