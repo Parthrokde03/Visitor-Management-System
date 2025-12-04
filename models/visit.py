@@ -524,11 +524,24 @@ class CompanyLocationQuestion(models.Model):
     question_text = fields.Char("Question", required=True)
     question_type = fields.Selection([("checkbox", "Checkbox")], default="checkbox")
     required = fields.Boolean("Required", default=False)
+    correct_option_id = fields.Many2one(
+        "company.location.question.option",
+        string="Correct Answer",
+        ondelete="set null",
+        domain="[('question_id', '=', id)]",
+        help="Option that is considered correct for this question.",
+    )
     option_ids = fields.One2many(
         "company.location.question.option",
         "question_id",
         string="Options"
     )
+
+    @api.constrains("correct_option_id", "option_ids")
+    def _check_correct_option(self):
+        for question in self:
+            if question.correct_option_id and question.correct_option_id not in question.option_ids:
+                raise ValidationError(_("Correct answer must be one of the options for this question."))
 
 
 class CompanyLocationQuestionOption(models.Model):

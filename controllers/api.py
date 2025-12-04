@@ -1073,6 +1073,8 @@ class VisitorQuestionController(http.Controller):
             "type": q.question_type,
             "required": q.required,
             "visit_type_id": q.visit_type_id.id if getattr(q, 'visit_type_id', False) else None,
+            "correct_option_id": q.correct_option_id.id if getattr(q, 'correct_option_id', False) else None,
+            "correct_option_name": q.correct_option_id.name if getattr(q, 'correct_option_id', False) else None,
             "options": [{"id": opt.id, "name": opt.name} for opt in q.option_ids]
         } for q in questions_recs]
 
